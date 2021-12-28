@@ -2,48 +2,94 @@
   <div class="player">
     <Playing />
     <video
+      id="video"
       ref="videoPlayer"
       class="video-js vjs-radium-theme"
       poster="/radium_poster.png"
+      preload="auto"
       crossorigin="anonymous"
     >
-      <track kind="captions" :src="subtitleUrl" srclang="en" label="default" />
+      <!-- <track kind="captions" :src="subtitleUrl" srclang="en" label="default" /> -->
     </video>
   </div>
 </template>
 
 <script>
-import Playing from "../components/Playing";
-import videojs, { log } from "video.js";
-require("videojs-hls-quality-selector");
-require("videojs-contrib-quality-levels");
+// import Playing from "../components/Playing";
+// import videojs, { log } from "video.js";
+// require("videojs-hls-quality-selector");
+// require("videojs-contrib-quality-levels");
+
+// import p2pml from "../node_modules/p2p-media-loader-core/build/p2p-media-loader-core.js"
+// import "../node_modules/p2p-media-loader-hlsjs/build/p2p-media-loader-hlsjs.js";
+// import videojs, { log } from "video.js";
+// import videojs from "video.js";
+// import "videojs-contrib-hls"
 
 export default {
+  head() {
+    return {
+      script: [
+        {
+          src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js",
+        },
+        {
+          src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js",
+        },
+        {
+          src: "https://vjs.zencdn.net/7.6.0/video.js",
+        },
+        {
+          src: "https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest",
+        },
+      ],
+    };
+  },
   data() {
     return {
       player: null,
       subtitleUrl: `${this.$config.BASE_URL}/subs.vtt`,
-      options: {
-        autoplay: true,
-        controls: true,
-        liveui: true,
-        sources: [
-          {
-            src: this.$config.HLS_URL,
-            type: "application/x-mpegURL"
-          }
-        ]
-      }
     };
   },
   mounted() {
+    let engine = new p2pml.hlsjs.Engine();
     // Initialize player
     this.player = videojs(
       this.$refs.videoPlayer,
-      this.options,
-      function onPlayerReady() {
-        this.hlsQualitySelector();
-      }
+      {
+        autoplay: true,
+        controls: true,
+        liveui: true,
+        html5: {
+          hlsjsConfig: {
+            liveSyncDurationCount: 7, // To have at least 7 segments in queue
+            loader: engine.createLoaderClass(),
+          },
+        },
+        sources: [
+          {
+            src: this.$config.HLS_URL,
+            type: "application/x-mpegURL",
+  },
+        ],
+      },
+      // function onPlayerReady() {
+      //   console.log("player ready");
+      // }
+    );
+
+    p2pml.hlsjs.initVideoJsContribHlsJsPlayer(this.player);
+
+    engine.on("peer_connect", (peer) =>
+      console.log("peer_connect", peer.id, peer.remoteAddress)
+    );
+    engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
+    engine.on("segment_loaded", (segment, peerId) =>
+      console.log(
+        "segment_loaded from",
+        peerId ? `peer ${peerId}` : "HTTP",
+        segment.url
+      )
     );
     // If Radium is running in protected mode, add a token to headers for authentication
     if (this.$config.PROTECT) {
@@ -60,7 +106,7 @@ export default {
 
     // Set player volume to 25% as videojs volume isn't persisted
     // maybe add that in the future
-    this.player.volume(0.25);
+    this.player.volume(1);
 
     // Send player state to server for new client
     this.$root.mySocket.on("requestState", id => {
