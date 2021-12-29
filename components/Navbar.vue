@@ -34,7 +34,7 @@
             </button>
             <button class="button is-dark" @click="pause">
               <b-icon icon="pause"></b-icon>
-            </button>
+            </button> -->
             <button
               v-if="$store.state.user.admin"
               class="button is-dark"
