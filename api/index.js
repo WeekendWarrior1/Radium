@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const socket = require("socket.io");
 
 // Create express instance
@@ -7,10 +8,23 @@ const app = express();
 // Require API routes
 const auth = require("./routes/auth");
 const emotes = require("./routes/emotes");
+const jellyfin = require("./routes/jellyfin");
+const { makeSureSegmentIsFinished, staticFileServe } = require("./routes/hls");
+
+app.use(cors({
+	origin: '*',
+	methods: ['GET', 'POST'],
+	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-HTTP-Method-Override', 'Accept'],
+	credentials: true,
+}));
 
 // Import API Routes
 app.use(auth);
 app.use(emotes);
+app.use(jellyfin);
+
+app.use(makeSureSegmentIsFinished);
+app.use(staticFileServe);
 
 // Export express app
 module.exports = app;

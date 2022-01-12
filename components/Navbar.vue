@@ -24,12 +24,18 @@
           ></b-icon
           >Now Playing
         </b-navbar-item>
+        <b-navbar-item @click="jellyfin">
+          <!-- <span> -->
+            <img src="/jellyfin-icon-transparent.svg" alt="jellyfin">
+          <!-- </span> -->
+          Search Jellyfin
+        </b-navbar-item>
       </template>
 
       <template slot="end">
         <b-navbar-item tag="div">
           <div class="buttons">
-            <button class="button is-dark" @click="play">
+            <!-- <button class="button is-dark" @click="play">
               <b-icon icon="play"></b-icon>
             </button>
             <button class="button is-dark" @click="pause">
@@ -131,6 +137,9 @@ export default {
     },
     nowplaying() {
       $nuxt.$emit("nowplaying");
+    },
+    jellyfin() {
+      $nuxt.$emit("jellyfin");
     }
   }
 };

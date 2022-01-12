@@ -1,6 +1,7 @@
 <template>
   <div class="player">
     <Playing />
+    <Jellyfin />
     <video
       id="video"
       ref="videoPlayer"
@@ -37,7 +38,8 @@ export default {
           src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js",
         },
         {
-          src: "https://vjs.zencdn.net/7.6.0/video.js",
+          //16 seems to be latest that p2p works with
+          src: "https://vjs.zencdn.net/7.16.0/video.min.js",
         },
         {
           src: "https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest",
@@ -52,12 +54,14 @@ export default {
     };
   },
   mounted() {
+    this.ui_stateChange = false;
+
     let engine = new p2pml.hlsjs.Engine();
     // Initialize player
     this.player = videojs(
       this.$refs.videoPlayer,
       {
-        autoplay: true,
+        autoplay: false,
         controls: true,
         liveui: true,
         html5: {
@@ -70,31 +74,51 @@ export default {
           {
             src: this.$config.HLS_URL,
             type: "application/x-mpegURL",
-  },
+          },
         ],
-      },
+      }
       // function onPlayerReady() {
       //   console.log("player ready");
       // }
     );
 
+    //add play pause listener
+    this.player.on("play", (event) => {
+      console.log(event);
+      if (!this.ui_stateChange) {
+        this.ui_stateChange = true;
+        this.$root.mySocket.emit("play", "UI_trick");
+      }
+      // } else {
+      //   ui_stateChange = false;
+      // }
+    });
+
+    this.player.on("pause", (event) => {
+      if (!this.ui_stateChange) {
+        this.ui_stateChange = true;
+        this.$root.mySocket.emit("pause");
+      }
+    });
+
     p2pml.hlsjs.initVideoJsContribHlsJsPlayer(this.player);
 
-    engine.on("peer_connect", (peer) =>
-      console.log("peer_connect", peer.id, peer.remoteAddress)
-    );
-    engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
-    engine.on("segment_loaded", (segment, peerId) =>
-      console.log(
-        "segment_loaded from",
-        peerId ? `peer ${peerId}` : "HTTP",
-        segment.url
-      )
-    );
+    // engine.on("peer_connect", (peer) =>
+    //   console.log("peer_connect", peer.id, peer.remoteAddress)
+    // );
+    // engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
+    // engine.on("segment_loaded", (segment, peerId) =>
+    //   console.log(
+    //     "segment_loaded from",
+    //     peerId ? `peer ${peerId}` : "HTTP",
+    //     segment.url
+    //   )
+    // );
+
     // If Radium is running in protected mode, add a token to headers for authentication
     if (this.$config.PROTECT) {
       const token = this.$store.state.token;
-      videojs.Hls.xhr.beforeRequest = function(options) {
+      videojs.Hls.xhr.beforeRequest = function (options) {
         if (options.headers == undefined) {
           options.headers = {};
         }
@@ -109,7 +133,7 @@ export default {
     this.player.volume(1);
 
     // Send player state to server for new client
-    this.$root.mySocket.on("requestState", id => {
+    this.$root.mySocket.on("requestState", (id) => {
       var time = this.player.currentTime();
       var state = this.player.paused();
       var id = id;
@@ -118,7 +142,7 @@ export default {
     });
 
     // If new client, set state from server
-    this.$root.mySocket.on("setState", state => {
+    this.$root.mySocket.on("setState", (state) => {
       // Set HLS stream
       console.log(state);
       if (state.roomHlsUrl) {
@@ -144,7 +168,7 @@ export default {
               src: state.roomSubtitleUrl,
               srclang: "en",
               label: "custom",
-              default: true
+              default: true,
             },
             true
           );
@@ -169,19 +193,19 @@ export default {
     });
 
     // Change HLS Stream
-    this.$root.mySocket.on("setStream", url => {
+    this.$root.mySocket.on("setStream", (url) => {
       this.player.src(url);
       // Toast notification
       this.$buefy.toast.open({
         duration: 2000,
         message: `Changed HLS Stream`,
         position: "is-bottom",
-        type: "is-success"
+        type: "is-success",
       });
     });
 
     // change subtitles
-    this.$root.mySocket.on("setSubtitles", url => {
+    this.$root.mySocket.on("setSubtitles", (url) => {
       // Remove old subtitles
       setTimeout(() => {
         var oldTracks = this.player.remoteTextTracks();
@@ -200,7 +224,7 @@ export default {
             src: url,
             srclang: "en",
             label: "custom",
-            default: true
+            default: true,
           },
           true
         );
@@ -211,42 +235,59 @@ export default {
         duration: 2000,
         message: `Changed Subtitles`,
         position: "is-bottom",
-        type: "is-success"
+        type: "is-success",
       });
     });
 
     // Nuxt bus for syncing rom
     this.$nuxt.$on("sync", () => {
-      this.$root.mySocket.emit("sync", this.player.currentTime());
+      this.$root.mySocket.emit(
+        "sync",
+        (this.player.currentTime(), this.player.paused())
+      );
     });
 
     // on sendPlay from server
-    this.$root.mySocket.on("sendPlay", () => {
-      this.player.play();
-      this.$buefy.toast.open({
-        duration: 500,
-        message: `Play`,
-        position: "is-bottom"
-      });
+    this.$root.mySocket.on("sendPlay", (message) => {
+      console.log("sendPlay", message);
+      if (this.player.paused()) {
+        this.player.play();
+        this.$buefy.toast.open({
+          duration: 500,
+          message: `Play`,
+          position: "is-bottom",
+        });
+      }
+      this.ui_stateChange = false;
     });
 
     // on sendPause from server
     this.$root.mySocket.on("sendPause", () => {
-      this.player.pause();
-      this.$buefy.toast.open({
-        duration: 500,
-        message: `Pause`,
-        position: "is-bottom"
-      });
+      console.log("sendPause");
+      if (!this.player.paused()) {
+        this.player.pause();
+        this.$buefy.toast.open({
+          duration: 500,
+          message: `Pause`,
+          position: "is-bottom",
+        });
+      }
+      this.ui_stateChange = false;
     });
 
     // on sendSync from server
-    this.$root.mySocket.on("sendSync", currentTime => {
+    this.$root.mySocket.on("sendSync", (currentTime, paused) => {
+      // if (paused == true) {
+      //   this.player.pause();
+      // }
       this.player.currentTime(currentTime);
+      // if (paused == false) {
+      //   this.player.play();
+      // }
       this.$buefy.toast.open({
         duration: 500,
         message: `Syncing`,
-        position: "is-bottom"
+        position: "is-bottom",
       });
     });
   },
@@ -254,7 +295,7 @@ export default {
     if (this.player) {
       this.player.dispose();
     }
-  }
+  },
 };
 </script>
 

@@ -33,15 +33,20 @@ export default function() {
 
       // When new user connects
       socket.on("newUser", user => {
+        console.log("creating new user", users.length);
+
         const u = {
           id: socket.id,
           username: user.username,
           color: user.color,
-          admin: user.admin
+          admin: user.admin,
         };
 
         // Push user into array
         users.push(u);
+
+        // if first user in room, that user is admin
+        // admin = u;
 
         // Sent user list to clients
         io.emit("userList", users);
@@ -51,6 +56,11 @@ export default function() {
         if (check) {
           // request info from that admin
           io.to(check.id).emit("requestState", socket.id);
+        }
+
+        if (users.length == 1) {
+          users[0].admin = true;
+          io.emit("userList", users);
         }
       });
 
@@ -73,19 +83,20 @@ export default function() {
         io.emit("userList", users);
       });
 
-      socket.on("play", () => {
-        io.emit("sendPlay");
+      socket.on("play", (message) => {
+        io.emit("sendPlay", message);
       });
 
       socket.on("pause", () => {
         io.emit("sendPause");
       });
 
-      socket.on("sync", currentTime => {
-        io.emit("sendSync", currentTime);
+      socket.on("sync", (currentTime, paused) => {
+        io.emit("sendSync", (currentTime, paused));
       });
 
       socket.on("changeStream", url => {
+        // TODO when changing stream, check for existing encode job and stop it
         roomHlsUrl = url;
         io.emit("setStream", url);
       });
@@ -103,6 +114,11 @@ export default function() {
         roomPlaying = playing;
         io.emit("setNowPlaying", playing);
       });
+
+      // socket.on("searchJellyfin", searchTerm => {
+      //   roomPlaying = playing;
+      //   io.emit("setNowPlaying", playing);
+      // });
 
       // On disconnect find and remove user from users array
       socket.on("disconnect", () => {
