@@ -11,7 +11,7 @@
               v-bind:src="`${parent.$config.BASE_URL}/api/jellyfin/poster?item=${item.Id}&tag=${item.BackdropImageTags[0]}`"
             />
           </a>
-          <a v-else v-on:click="startMovie(item.Id)">
+          <a v-else v-on:click="startMovie(item)">
             <img
               v-bind:src="`${parent.$config.BASE_URL}/api/jellyfin/poster?item=${item.Id}&tag=${item.BackdropImageTags[0]}`"
             />
@@ -78,10 +78,14 @@ export default {
         });
       }
     },
-    startMovie(itemId) {
+    startMovie(item) {
       this.$root.mySocket.emit(
         "changeStream",
-        `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${itemId}`
+        item.Id,
+        `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${item.Id}`,
+        item.BackdropImageTags.length
+          ? `${this.$config.BASE_URL}/api/jellyfin/backdrop?item=${item.Id}&tag=${item.BackdropImageTags[0]}`
+          : false
       );
       this.$nuxt.$emit("hideJellyfin");
     },

@@ -3,11 +3,12 @@ const spawn = require('await-spawn')
 
 const config = require("../nuxt.config.js");
 
-const ffprobe = require('ffprobe');
 const JSONStream = require('JSONStream');
 const fs = require('fs');
 
 const ffmpegJobQueue = {};
+
+exports.ffmpegJobQueue = ffmpegJobQueue;
 
 exports.startHLSstream = async function startHLSstream(itemId, mediaLocation) {
     if (ffmpegJobQueue[itemId] == undefined) {
@@ -40,15 +41,34 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation) {
         // as long as video.js knows to keep redownloading the m3u8 based on it's stream header
         // also means I can copy a video stream instead of reencoding it for new keyframes
         playlist = await createHLSPlayList(workDir, 'playlist', itemId, mediaInfo);
+        ffmpegJobQueue[itemId]['playlist'] = playlist;
 
-        ffmpegJobQueue[itemId] = {
-            'ffmpeg': startffmpegHLSTranscode(transcodeStringBuilder(mediaInfo, mediaLocation, false, workDir), workDir, itemId)
-        };
+        ffmpegJobQueue[itemId]['ffmpeg'] = startffmpegHLSTranscode(transcodeStringBuilder(mediaInfo, mediaLocation, false, workDir), workDir, itemId);
     } else {
-        playlist = await fs.promises.readFile(`${workDir}/playlist.m3u8`);
+        while (ffmpegJobQueue[itemId]['playlist'] == undefined) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        playlist = ffmpegJobQueue[itemId]['playlist'];
+        // if (ffmpegJobQueue[itemId]['playlist']) {
+        //     playlist = ffmpegJobQueue[itemId]['playlist'];
+        // } else {
+        //     // have to add a wait here until file exists
+        //     // TODO ugly
+        //     await new Promise(resolve => setTimeout(resolve, 1000));
+        //     playlist = await fs.promises.readFile(`${workDir}playlist.m3u8`);
+        // }
     }
     return playlist;
 }
+
+// TODO sanitise itemId string
+function cleanUpffmpegDir(itemId) {
+    let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${itemId}/`;
+    console.log(`Deleting ${workDir}...`)
+    fs.rmSync(workDir, { recursive: true, force: true });
+}
+
+exports.cleanUpffmpegDir = cleanUpffmpegDir;
 
 function transcodeStringBuilder(mediaInfo, mediaLocation, seekTime, workDir) {
     // TODO this does not handle 23.976 fps nicely when it comes to keyframes every x
@@ -73,8 +93,8 @@ function transcodeStringBuilder(mediaInfo, mediaLocation, seekTime, workDir) {
         mediaInfo.format.bit_rate <= 6144000 && mediaInfo.streams[0].codec_name == 'h264'/*(6000 kbs) */ ?
         // TODO will need to use copy but have to handle keyframes
         //  `-c:v copy` :
-        `-c:v libx264 -preset slow -crf 23 ` :
-        `-c:v libx264 -preset slow -crf 23 `,
+        `-c:v libx264 -preset ${config.default.publicRuntimeConfig.FFMPEG_PRESET_SPEED} -crf 23 ` :
+        `-c:v libx264 -preset ${config.default.publicRuntimeConfig.FFMPEG_PRESET_SPEED} -crf 23 `,
         // if h264 codec and under max bitrate (6000 for now)
         // `-c:v copy`,
 
@@ -99,7 +119,6 @@ function transcodeStringBuilder(mediaInfo, mediaLocation, seekTime, workDir) {
     for (const arg of ffmpegArgs) {
         ffmpegString += arg;
     }
-    // ffmpegString += `${settings.transcodeLocation}${outputFileName}.mp4`
     /*
         "-ss", time,
         "-i", input,
@@ -134,7 +153,8 @@ async function createHLSPlayList(destination, playlist_filename, itemId, mediaIn
     let playlistM3U8 = `#EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=${mediaInfo.streams[0].width}x${mediaInfo.streams[0].height}
-${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${mediaInfo.streams[0].height}p.m3u8`
+${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/stream0.m3u8`
+//${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${mediaInfo.streams[0].height}p.m3u8`
 
     let segmentM3U8 = `#EXTM3U
 #EXT-X-VERSION:3
@@ -153,13 +173,17 @@ ${i.toString().padStart(segmentsCount.toString().length, '0')}.ts`;
 
     await Promise.all([
         fs.promises.writeFile(`${destination}/${playlist_filename}.m3u8`, playlistM3U8),
-        fs.promises.writeFile(`${destination}/${mediaInfo.streams[0].height}p.m3u8`, segmentM3U8)]);
+        fs.promises.writeFile(`${destination}/stream0.m3u8`, segmentM3U8)]);
+        // fs.promises.writeFile(`${destination}/${mediaInfo.streams[0].height}p.m3u8`, segmentM3U8)]);
 
     return playlistM3U8;
 }
 
 function startffmpegHLSTranscode(ffmpegcommand, destination, itemId) {
     // TODO: can send abortsignal
+    // const ac = new AbortController();
+    // const { signal } = ac;
+    // setTimeout(() => ac.abort(), 30000);
     return child_process.exec(ffmpegcommand, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);

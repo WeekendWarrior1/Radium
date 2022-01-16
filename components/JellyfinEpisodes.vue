@@ -4,7 +4,7 @@
       <div v-for="item in episodes.Items" v-bind:key="item.Id">
         <div class="movie__poster">
           <!-- TODO: fallback to tv show poster if series poster can't be found -->
-          <a v-on:click="startEpisode(item.Id)">
+          <a v-on:click="startEpisode(item)">
             <img
               v-bind:src="`${parent.$config.BASE_URL}/api/jellyfin/poster?item=${item.Id}&tag=${item.ImageTags.Primary}`"
             />
@@ -34,10 +34,14 @@ export default {
     });
   },
   methods: {
-    startEpisode(itemId) {
+    startEpisode(item) {
       this.$root.mySocket.emit(
         "changeStream",
-        `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${itemId}`
+        item.Id,
+        `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${item.Id}`,
+        item.ParentBackdropImageTags.length
+          ? `${this.$config.BASE_URL}/api/jellyfin/backdrop?item=${item.ParentBackdropItemId}&tag=${item.ParentBackdropImageTags[0]}`
+          : false
       );
       this.$nuxt.$emit("hideJellyfin");
     },

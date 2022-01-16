@@ -1,4 +1,8 @@
-FROM node:12.19.0-alpine3.12
+# 16.13.2
+FROM node:lts-alpine3.14    
+
+# install ffmpeg and ffprobe
+RUN apk add --no-cache ffmpeg
 
 # create destination directory
 WORKDIR /opt/app
@@ -13,11 +17,12 @@ COPY . /opt/app
 # build
 RUN npm run build
 
-# expose 3000 on container
-EXPOSE 3000
+# expose 5555 on container
+EXPOSE 5555
+EXPOSE 5556
 
 ENV NUXT_HOST=0.0.0.0
-ENV NUXT_PORT=3000
+ENV NUXT_PORT=5555
 
 # start the app
 CMD [ "npm", "start" ]

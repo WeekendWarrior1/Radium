@@ -127,7 +127,7 @@ export default {
       this.$root.mySocket.emit("pause");
     },
     sync() {
-      $nuxt.$emit("sync");
+      this.$root.mySocket.emit("sync");
     },
     toggleChat: function() {
       this.$store.commit("toggleChat");

@@ -28,7 +28,7 @@
         >
         <div class="field is-grouped">
           <p class="control is-expanded">
-            <input v-model="jellyfinQuery" class="input" type="text" />
+            <input v-model="jellyfinQuery" class="input" type="text" v-on:keyup.enter="searchJellyfin" />
           </p>
 
           <input
@@ -58,7 +58,7 @@
           <label class="label has-text-white" for="series">TeeVee</label>
           <div>
             <p class="control">
-              <a class="button is-black" @click="searchJellyfin">Search</a>
+              <a type="button" class="button is-black" @click="searchJellyfin">Search</a>
             </p>
           </div>
         </div>

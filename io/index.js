@@ -1,5 +1,10 @@
 import http from "http";
 import socketIO from "socket.io";
+const torrentTrackerServer = require('bittorrent-tracker').Server;
+
+const config = require("../nuxt.config.js");
+const { ffmpegJobQueue, cleanUpffmpegDir } = require("../util/ffmpeg.js");
+
 
 export default function() {
   this.nuxt.hook("render:before", renderer => {
@@ -10,7 +15,7 @@ export default function() {
     this.nuxt.server.listen = (port, host) =>
       new Promise(resolve =>
         server.listen(
-          process.env.PORT || 3000,
+          process.env.PORT || 5555,
           process.env.HOST || "0.0.0.0",
           resolve
         )
@@ -83,21 +88,37 @@ export default function() {
         io.emit("userList", users);
       });
 
-      socket.on("play", (message) => {
-        io.emit("sendPlay", message);
+      socket.on("play", (time) => {
+        io.emit("serverPlay", time);
       });
 
-      socket.on("pause", () => {
-        io.emit("sendPause");
+      socket.on("pause", (time) => {
+        io.emit("serverPause", time);
       });
 
-      socket.on("sync", (currentTime, paused) => {
-        io.emit("sendSync", (currentTime, paused));
+      socket.on("sync", (currentTime) => {
+        io.emit("serverSync", currentTime);
       });
 
-      socket.on("changeStream", url => {
-        // TODO when changing stream, check for existing encode job and stop it
+      socket.on("changeStream", (newUUID, url, posterUrl) => {
+        // TODO ugly and non discriminate, will need to change when software handles mutliple rooms
+        for (let itemId in ffmpegJobQueue) {
+          console.log(`Checking ffmpegJobQueue for any existing transcode jobs that need to be cancelled`);
+          if (itemId != newUUID) {
+            console.log(`Cancelling ${itemId} transcode job`);
+            ffmpegJobQueue[itemId]['ffmpeg'].kill();
+            // ffmpegJobQueue[itemId]['ffmpeg'].kill('SIGINT');
+            // TODO just waiting 1000ms is a bit ugly
+            setTimeout(function(){
+              delete ffmpegJobQueue[itemId];
+              cleanUpffmpegDir(itemId);
+            },1000);
+          }
+        }
         roomHlsUrl = url;
+        if (posterUrl) {
+          io.emit("setPoster", posterUrl);
+        }
         io.emit("setStream", url);
       });
 
@@ -131,5 +152,39 @@ export default function() {
         io.emit("userList", users);
       });
     });
+
+    // Fire up built in webtorrent tracker
+    if (config.default.publicRuntimeConfig.WEBTORRENT_TRACKER_ENABLED) {
+      const torrentTracker = new torrentTrackerServer({
+        udp: false, // enable udp server? [default=true]
+        http: false, // enable http server? [default=true]
+        ws: true, // enable websocket server? [default=true]
+        stats: false, // enable web-based statistics? [default=true]
+        trustProxy: false, // enable trusting x-forwarded-for header for remote IP [default=false] TODO should this be configruable?
+      })
+
+      torrentTracker.on('error', function (err) {
+        // fatal server error!
+        console.log(err.message)
+      })
+
+      torrentTracker.on('warning', function (err) {
+        // client sent bad data. probably not a problem, just a buggy client.
+        console.log(err.message)
+      })
+
+      torrentTracker.on('listening', function () {
+        const wsAddr = torrentTracker.http.address()
+        const wsHost = wsAddr.address !== '::' ? wsAddr.address : 'localhost'
+        const wsPort = wsAddr.port
+        console.log(`WebSocket tracker: ws://${wsHost}:${wsPort}`)
+
+      })
+
+      // start tracker server listening!
+      const torrentTrackerPort = config.default.publicRuntimeConfig.WEBTORRENT_TRACKER_PORT;
+      const torrentTrackerHostname = config.default.publicRuntimeConfig.WEBTORRENT_TRACKER_ADDRESS;
+      torrentTracker.listen(torrentTrackerPort, torrentTrackerHostname);
+      }
   });
 }

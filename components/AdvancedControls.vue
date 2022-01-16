@@ -150,6 +150,7 @@ export default {
     });
   },
   methods: {
+    // TODO deprecated, either cleanup or remove
     changeStream() {
       // Check if url is a proper HLS stream then emit to Player
       if (this.hlsUrl == "") {
