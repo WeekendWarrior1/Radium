@@ -2,10 +2,27 @@ version: "3.3"
 services:
   radium:
     container_name: radium
+    # network_mode: "host"
     ports:
-      - "3000:3000"
+      - "5555:5555"
+      - "5556:5556"
     environment:
-      - "BASE_URL=https://radium.example.com"
+    # TODO minmise amount of config by tacking ontop of baseurl
+      - "BASE_URL=http://192.168.1.2:5555"
       #  - 'HLS_URL=https://domain.com/stream.m3u8'
-      #  - ADMIN_TOKEN=secret123
-    image: "zibbp/radium:latest"
+      - "ADMIN_TOKEN=placeholder"
+      - "API_URL=http://192.168.1.2:5555/api"
+      - "PUBLIC=/opt/app/public/"
+      - "HLS_SERVE_DIR=/opt/app/public/hls/"
+      - "HLS_STREAM_ROOT=http://192.168.1.2:5555/api/hls/"
+      - "FFMPEG_PRESET_SPEED=medium"
+      # - "HLS_SEGMENT_SIZE="
+      # - "WEBTORRENT_TRACKER_ENABLED="
+      - "WEBTORRENT_BASE_URL=ws://192.168.1.2:5556"
+      - "WEBTORRENT_TRACKER_ADDRESS=192.168.1.2"
+      - "WEBTORRENT_TRACKER_PORT=5556"
+      # - "JELLYFIN_ENABLED="
+      - "JELLYFIN_BASE_URI=http://192.168.1.2:8096"
+      - "JELLYFIN_USER=f15916cec2f24ba0956e4b135ac779bb"
+      - "JELLYFIN_API_KEY=f8d5769c207046a68987e7d0e80ceef3"
+    image: "radium:latest"
