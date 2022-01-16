@@ -262,11 +262,11 @@ export default {
     // on sendSync from server
     this.$root.mySocket.on("serverSync", (currentTime) => {
       this.player.currentTime(currentTime);
-      this.$buefy.toast.open({
-        duration: 500,
-        message: `Syncing`,
-        position: "is-bottom",
-      });
+      // this.$buefy.toast.open({
+      //   duration: 100,
+      //   message: `Syncing`,
+      //   position: "is-bottom",
+      // });
     });
   
     // on setPoster from stream

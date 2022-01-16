@@ -39,7 +39,7 @@ export default {
         "changeStream",
         item.Id,
         `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${item.Id}`,
-        item.ParentBackdropImageTags.length
+        item.ParentBackdropImageTags && item.ParentBackdropImageTags.length
           ? `${this.$config.BASE_URL}/api/jellyfin/backdrop?item=${item.ParentBackdropItemId}&tag=${item.ParentBackdropImageTags[0]}`
           : false
       );
