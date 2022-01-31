@@ -3,6 +3,8 @@ const spawn = require('await-spawn')
 
 const config = require("../nuxt.config.js");
 
+// const { jellyfinGetSubtitles } = require('../api/routes/jellyfin');
+
 const JSONStream = require('JSONStream');
 const fs = require('fs');
 
@@ -10,7 +12,7 @@ const ffmpegJobQueue = {};
 
 exports.ffmpegJobQueue = ffmpegJobQueue;
 
-exports.startHLSstream = async function startHLSstream(itemId, mediaLocation) {
+exports.startHLSstream = async function startHLSstream(itemId, mediaLocation, subtitleInfo) {
     if (ffmpegJobQueue[itemId] == undefined) {
         ffmpegJobQueue[itemId] = {};
     }
@@ -21,6 +23,7 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation) {
         console.log(`Starting ${itemId} transcode job`);
         const mediaInfo = await ffprobeMediaInfo(mediaLocation);
         // console.log(mediaInfo);
+        // console.log(subtitleInfo);
 
         try {
             await fs.promises.mkdir(workDir);
@@ -28,7 +31,7 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation) {
             if (error.code === 'EEXIST') {
                 console.log(`'${itemId}' workdir already exists at: ${workDir}, removing all .ts and .m3u8 within...`)
                 fs.readdirSync(workDir)
-                    .filter(f => (f.endsWith('.ts') || f.endsWith('.m3u8') || f == 'ffmpeg_finished'))
+                    .filter(f => (f.endsWith('.ts') || f.endsWith('.m3u8') || f.endsWith('.vtt') || f == 'ffmpeg_finished'))
                     .map(f => fs.unlinkSync(workDir + f))
             } else {
                 console.log(error);
@@ -40,7 +43,7 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation) {
         // would mean I don't have to make sure segments exist when a client retrieves them
         // as long as video.js knows to keep redownloading the m3u8 based on it's stream header
         // also means I can copy a video stream instead of reencoding it for new keyframes
-        playlist = await createHLSPlayList(workDir, 'playlist', itemId, mediaInfo);
+        playlist = await createHLSPlayList(workDir, 'playlist', itemId, mediaInfo, subtitleInfo);
         ffmpegJobQueue[itemId]['playlist'] = playlist;
 
         ffmpegJobQueue[itemId]['ffmpeg'] = startffmpegHLSTranscode(transcodeStringBuilder(mediaInfo, mediaLocation, false, workDir), workDir, itemId);
@@ -148,20 +151,28 @@ async function ffprobeMediaInfo(video_input) {
     }
 }
 
-async function createHLSPlayList(destination, playlist_filename, itemId, mediaInfo) {
+async function createHLSPlayList(destination, playlist_filename, itemId, mediaInfo, subtitleInfo) {
     const duration = mediaInfo.format.duration;
+
     let playlistM3U8 = `#EXTM3U
-#EXT-X-VERSION:3
-#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=${mediaInfo.streams[0].width}x${mediaInfo.streams[0].height}
+#EXT-X-VERSION:3`
+    for (let sub of subtitleInfo) {
+        // add each subtitle to playlist m3u8
+        sub.hls_playlist_name = `${sub.Language}${(sub.IsForced)? `_forced` : ``}${(sub.Title)? `- ${sub.Title}` : ``}`;
+        sub.hls_serve_file = sub.DeliveryUrl.split('/Videos/')[1].split('?')[0];
+        playlistM3U8 += `\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${sub.hls_playlist_name}",DEFAULT=${sub.IsDefault?'YES':'NO'},AUTOSELECT=NO,URI="${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${sub.hls_playlist_name}.m3u8"`
+        // playlistM3U8 += `\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${sub.hls_playlist_name}",DEFAULT=${sub.IsDefault?'YES':'NO'},AUTOSELECT=NO,URI="${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${sub.hls_playlist_name}.m3u8"`
+    }
+    playlistM3U8 += `\n#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=${mediaInfo.streams[0].width}x${mediaInfo.streams[0].height}${(subtitleInfo.length) ? `,SUBTITLES="subs"` : ``}
 ${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/stream0.m3u8`
-//${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${mediaInfo.streams[0].height}p.m3u8`
+
 
     let segmentM3U8 = `#EXTM3U
 #EXT-X-VERSION:3
 #EXT-X-TARGETDURATION:${config.default.publicRuntimeConfig.HLS_SEGMENT_SIZE}
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-PLAYLIST-TYPE:VOD`;
-    let segmentsCount = parseInt(duration / config.default.publicRuntimeConfig.HLS_SEGMENT_SIZE) + 1;
+    let segmentsCount = parseInt(duration / config.default.publicRuntimeConfig.HLS_SEGMENT_SIZE);
     for (let i = 0; i < segmentsCount; i++) {
         // add each segment to segments .m3u8
         segmentM3U8 += `
@@ -171,20 +182,40 @@ ${i.toString().padStart(segmentsCount.toString().length, '0')}.ts`;
     segmentM3U8 += `
 #EXT-X-ENDLIST`;
 
+
+    for (let sub of subtitleInfo) {
+        sub.hls_playlist = `#EXTM3U
+#EXT-X-TARGETDURATION:${parseInt(duration)}
+#EXT-X-VERSION:3
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXTINF:${parseInt(duration)}
+${config.default.publicRuntimeConfig.BASE_URL}/api/jellyfin/subtitlestream/${sub.hls_serve_file}
+#EXT-X-ENDLIST`
+// TODO this is not agnostic to media source, jellyfin only atm
+    }
+
     await Promise.all([
         fs.promises.writeFile(`${destination}/${playlist_filename}.m3u8`, playlistM3U8),
         fs.promises.writeFile(`${destination}/stream0.m3u8`, segmentM3U8)]);
+        // should I retrieve all the subs in parallel?
+
         // fs.promises.writeFile(`${destination}/${mediaInfo.streams[0].height}p.m3u8`, segmentM3U8)]);
+    await Promise.all(
+        subtitleInfo.map(async (sub) => {
+            fs.promises.writeFile(`${destination}/${sub.hls_playlist_name}.m3u8`, sub.hls_playlist);
+        })
+    );
 
     return playlistM3U8;
 }
 
-function startffmpegHLSTranscode(ffmpegcommand, destination, itemId) {
+function startffmpegHLSTranscode(ffmpegCommand, destination, itemId) {
     // TODO: can send abortsignal
     // const ac = new AbortController();
     // const { signal } = ac;
     // setTimeout(() => ac.abort(), 30000);
-    return child_process.exec(ffmpegcommand, (error, stdout, stderr) => {
+    return child_process.exec(ffmpegCommand, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
             return;
@@ -198,3 +229,11 @@ function startffmpegHLSTranscode(ffmpegcommand, destination, itemId) {
         });
     });
 }
+
+async function ffmpegConvertSubtitles(subLocation, filename, extension) {
+    // let ffmpegCommand = `ffmpeg -i ${subLocation} -map 0:s:0 ${filename}`;
+    const ffmpegCommand = ['-y', '-i',subLocation, '-map', '0:s:0', filename]
+    return spawn(`ffmpeg`,ffmpegCommand);
+}
+
+exports.ffmpegConvertSubtitles = ffmpegConvertSubtitles;

@@ -1,9 +1,10 @@
 export default {
   publicRuntimeConfig: {
     HLS_URL:
-      process.env.HLS_URL || "",
+      process.env.HLS_URL || 
+      "",
       // "https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8",
-      //"http://d2zihajmogu5jn.cloudfront.net/bipbop-advanced/bipbop_16x9_variant.m3u8",
+      // "http://d2zihajmogu5jn.cloudfront.net/bipbop-advanced/bipbop_16x9_variant.m3u8",
       // "http://localhost:5555/api/jellyfin/stream?item=7bbe68ea4cd2b49c8da4a2bcf39bdb24",
     BASE_URL: process.env.BASE_URL || "http://localhost:5555",
     ADMIN_TOKEN: process.env.ADMIN_TOKEN || "placeholder",
@@ -16,7 +17,8 @@ export default {
     HLS_SERVE_DIR: process.env.HLS_SERVE_DIR || `/home/weekendwarrior1/git/weekendwarrior1/Radium/public/hls/`,
     HLS_STREAM_ROOT: process.env.HLS_STREAM_ROOT || `http://localhost:5555/api/hls/`,
     HLS_SEGMENT_SIZE: process.env.HLS_SEGMENT_SIZE || 10, // default 10 seconds
-    FFMPEG_PRESET_SPEED: process.env.FFMPEG_PRESET_SPEED || `slow`,
+    // FFMPEG_PRESET_SPEED: process.env.FFMPEG_PRESET_SPEED || `slow`,
+    FFMPEG_PRESET_SPEED: process.env.FFMPEG_PRESET_SPEED || `ultrafast`,
     WEBTORRENT_TRACKER_ENABLED: process.env.WEBTORRENT_TRACKER_ENABLED || true, // TODO this config really only works if you're running the builtin tracker locally
     WEBTORRENT_BASE_URL: process.env.WEBTORRENT_BASE_URL || "ws://localhost:8001",
     WEBTORRENT_TRACKER_ADDRESS: process.env.WEBTORRENT_TRACKER_ADDRESS || "localhost",

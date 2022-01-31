@@ -27,14 +27,24 @@ export default {
         },
         {
           src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js",
+          // src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.js",
         },
+        // {
+        //   src: "https://cdn.jsdelivr.net/npm/hls.js@latest"
+        // },
         {
-          //16 seems to be latest that p2p works with
+          //16 seems to be latest that p2p works with contrib-hls
           // src: "https://vjs.zencdn.net/7.16.0/video.min.js",
+
+          // src: "https://vjs.zencdn.net/7.17.0/video.min.js",
           src: "/video.min.js",
         },
         {
-          src: "https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest",
+          // 0.8.9 ?
+          // src: "https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest",
+
+          // src: "https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js",
+          src: "/videojs-hlsjs-plugin.js"
         },
       ],
     };
@@ -42,7 +52,7 @@ export default {
   data() {
     return {
       player: null,
-      subtitleUrl: `${this.$config.BASE_URL}/subs.vtt`,
+      // subtitleUrl: `${this.$config.BASE_URL}/subs.vtt`,
     };
   },
   mounted() {
@@ -54,30 +64,63 @@ export default {
       },
     };
     let engine = new p2pml.hlsjs.Engine(config);
+
+    let playerOptions = {
+      autoplay: false,
+      controls: true,
+      liveui: true,
+      textTrackSettings: true, // TODO change to false when finished messing with subs
+      html5: {
+        // vhs: {   // doesn't support p2p
+        //   overrideNative: false,
+        hlsjsConfig: {
+          liveSyncDurationCount: 7, // To have at least 7 segments in queue
+          loader: engine.createLoaderClass(),
+        },
+      },
+      sources: [
+        // {
+        //   src: this.$config.HLS_URL,
+        //   type: "application/x-mpegURL",
+        // },
+      ],
+    };
+
     // Initialize player
     this.player = videojs(
       this.$refs.videoPlayer,
-      {
-        autoplay: false,
-        controls: true,
-        liveui: true,
-        html5: {
-          hlsjsConfig: {
-            liveSyncDurationCount: 7, // To have at least 7 segments in queue
-            loader: engine.createLoaderClass(),
-          },
-        },
-        sources: [
-          // {
-          //   src: this.$config.HLS_URL,
-          //   type: "application/x-mpegURL",
-          // },
-        ],
-      }
+      playerOptions
+      // this.player.ready(function () {
+
+      // }),
       // function onPlayerReady() {
-      //   console.log("player ready");
+      //   console.log("ON PLAYER READY");
+      //   // let settings = new TextTrackSettings(this.player, playerOptions);
+
+      //   let settings = this.player.textTrackSettings;
+      //   // settings.backgroundColor = "#000";
+      //   // settings.backgroundOpacity = "0";
+      //   // settings.edgeStyle = "uniform";
+
+      //   settings.setValues({
+      //     backgroundColor: "#000",
+      //     backgroundOpacity: "0",
+      //     edgeStyle: "uniform",
+      //   });
+      //   settings.updateDisplay();
       // }
     );
+    // this.player.on("ready", (event) => {
+    //   console.log("ON PLAYER READY", this.player.TextTrackSettings.getValues());
+
+    //   let settings = this.player.TextTrackSettings;
+    //   settings.setValues({
+    //     backgroundColor: "#000",
+    //     backgroundOpacity: "0",
+    //     edgeStyle: "uniform",
+    //   });
+    //   settings.updateDisplay();
+    // });
 
     //add play pause listener
     this.player.on("playButton", (event, time) => {
@@ -95,19 +138,18 @@ export default {
       // if seeked a second time whilst this promise is still pending, cancel it
     });
 
-    p2pml.hlsjs.initVideoJsContribHlsJsPlayer(this.player);
+    // p2pml.hlsjs.initVideoJsContribHlsJsPlayer(this.player);
+    p2pml.hlsjs.initVideoJsHlsJsPlugin();
 
-    engine.on("peer_connect", (peer) =>
-      console.log("peer_connect", peer.id, peer.remoteAddress)
-    );
-    engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
-    engine.on("segment_loaded", (segment, peerId) =>
-      console.log(
-        "segment_loaded from",
-        peerId ? `peer ${peerId}` : "HTTP",
-        segment.url
-      )
-    );
+    // engine.on("peer_connect", (peer) => console.log("peer_connect", peer));
+    // engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
+    // engine.on("segment_loaded", (segment, peerId) =>
+    //   console.log(
+    //     "segment_loaded from",
+    //     peerId ? `peer ${peerId}` : "HTTP",
+    //     segment.url
+    //   )
+    // );
 
     // If Radium is running in protected mode, add a token to headers for authentication
     if (this.$config.PROTECT) {
@@ -272,12 +314,10 @@ export default {
     // on setPoster from stream
   //setPoster
     this.$root.mySocket.on("setPoster", (url) => {
-      console.log('setPoster',url);
+      console.log("setPoster", url);
         this.player.poster(url);
     });
   },
-
-
 
   beforeDestroy() {
     if (this.player) {

@@ -1,8 +1,9 @@
 const { Router } = require("express");
 const fetch = require("node-fetch");
+const retryFetch = require('fetch-retry')(fetch);
 
 const router = Router();
-const { ffmpegJobQueue, startHLSstream } = require('../../util/ffmpeg');
+const { ffmpegJobQueue, startHLSstream, ffmpegConvertSubtitles } = require('../../util/ffmpeg');
 
 const config = require("../../nuxt.config.js");
 
@@ -129,8 +130,9 @@ router.get(["/jellyfin/stream.m3u8"], async function (req, res, next) {
         if (req.query.item.includes('"') || req.query.item.includes('-') || req.query.item.includes(' ') || req.query.item.includes('|') || req.query.item.includes('&') || req.query.item.includes('/')) {
             throw new Error(`Don't even try it`);
         }
+        let subtitlesStreams = await jellyfinGetSubtitles(req.query.item);
 
-        let playlist = await startHLSstream(req.query.item,`${config.default.publicRuntimeConfig.JELLYFIN_BASE_URI}/Items/${req.query.item}/Download?api_key=${config.default.publicRuntimeConfig.JELLYFIN_API_KEY}`)
+        let playlist = await startHLSstream(req.query.item,`${config.default.publicRuntimeConfig.JELLYFIN_BASE_URI}/Items/${req.query.item}/Download?api_key=${config.default.publicRuntimeConfig.JELLYFIN_API_KEY}`, subtitlesStreams);
 
         res.header('Content-type', 'application/vnd.apple.mpegurl');
         res.send(playlist);
@@ -143,5 +145,73 @@ router.get(["/jellyfin/stream.m3u8"], async function (req, res, next) {
         }
     }
 });
+
+router.get("/jellyfin/subtitlestream/:guid/:itemId/Subtitles/:streamIndex/0/:filename", async function (req, res, next) {
+    console.log('hit /jellyfin/subtitlestream/', req.params);
+    try {
+        let url = `${config.default.publicRuntimeConfig.JELLYFIN_BASE_URI}/Videos/${req.params.guid}/${req.params.itemId}/Subtitles/${req.params.streamIndex}/0/${req.params.filename}?api_key=${config.default.publicRuntimeConfig.JELLYFIN_API_KEY}`;
+        if (!req.params.filename.endsWith('.vtt')) {
+            // have to use ffmpeg to convert to vtt
+            // attempt sanitise
+            if (url.includes('"') || url.includes(' ') || url.includes('|') || url.includes('&') || url.includes('\\')) {
+                throw new Error(`Don't even try it`);
+            }
+            let subFilename = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${req.params.itemId}/${req.params.streamIndex}.vtt`;
+            try {
+                // check directory to see if ffmpeg has already been run
+                await fs.promises.access(subFilename);
+                res.sendFile(subFilename);
+            } catch {
+                // file didn't exist in directory
+                await ffmpegConvertSubtitles(url,subFilename);
+                res.sendFile(subFilename);
+            }
+        } else {
+            // jellyfin doesn't always return here, so be ready to retry
+            retryFetch(url).then(actual => {
+                actual.headers.forEach((v, n) => res.setHeader(n, v));
+                actual.body.pipe(res);
+            });
+        }
+    } catch (error) {
+        if (error.message.includes("not found in query parameters")) {
+            res.status(400).send(error.message);
+        } else {
+            res.status(500).send(error.message);
+        }
+    }
+});
+
+async function jellyfinGetSubtitles(itemId) {
+    const response = await (await fetch(`${config.default.publicRuntimeConfig.JELLYFIN_BASE_URI}/Items/${itemId}/PlaybackInfo?api_key=${config.default.publicRuntimeConfig.JELLYFIN_API_KEY}&UserId=${config.default.publicRuntimeConfig.JELLYFIN_USER}`, {
+        method: 'post',
+        body: JSON.stringify({
+            "DeviceProfile": {
+                "SubtitleProfiles": [
+                {
+                    "Format": "vtt",
+                    "Method": "External"
+                },
+                {
+                    "Format": "ass",
+                    "Method": "External"
+                },
+                {
+                    "Format": "ssa",
+                    "Method": "External"
+                }
+                ]
+            }
+        }),
+        headers: {'Content-Type': 'application/json'}
+    })).json();
+    let subtitlesStreams = []
+    for (let stream of response.MediaSources[0].MediaStreams) {
+        if (stream.IsTextSubtitleStream && stream.SupportsExternalStream) {
+            subtitlesStreams.push(stream);
+        }
+    }
+    return subtitlesStreams;
+}
 
 module.exports = router;
