@@ -25,11 +25,14 @@ export default function() {
       nuxt.server.close;
     });
 
-    var users = [];
-    var connections = [];
-    let roomHlsUrl = null;
-    let roomSubtitleUrl = null;
-    var roomPlaying = null;
+    let users = [];
+    let connections = [];
+    // let roomHlsUrl = null;
+    // let roomSubtitleUrl = null;
+    // let roomPlaying = null;
+
+    const roomsCache = {};
+    exports.roomsCache = roomsCache;
 
     // Add socket.io events
     const messages = [];
@@ -69,14 +72,69 @@ export default function() {
         }
       });
 
+      socket.on("userEntersRoom", (roomUUID, user) => {
+        console.log("Adding user:", user.username, roomsCache[roomUUID].users.length);
+
+        const u = {
+          id: socket.id,
+          username: user.username,
+          color: user.color,
+          admin: user.admin,
+        };
+
+        // Push user into array
+        roomsCache[roomUUID].users.push(u);
+
+        socket.join(roomUUID);
+
+        // Sent user list to clients
+        io.to(roomUUID).emit("userList", roomUUID, roomsCache[roomUUID].users);
+
+        // request state from first in room
+        if (roomsCache[roomUUID].users.length > 1) {
+          // Not the first in the room
+          io.to(roomsCache[roomUUID].users[0].id).emit("requestState", roomUUID, socket.id);
+        } else if (roomsCache[roomUUID].roomHlsUrl) {
+          // first user in room, but room has roomHlsUrl already
+          let state = {
+            'roomHlsUrl': roomsCache[roomUUID].roomHlsUrl,
+            'roomPlaying': roomsCache[roomUUID].roomPlaying,
+          }
+          // room time may also exist and need to be sent
+          if (roomsCache[roomUUID].currentTime) {
+            state['roomTime'] = roomsCache[roomUUID].currentTime;
+          }
+          io.to(socket.id).emit("setState", state);
+        }
+        io.emit("roomsUpdated", roomsCache);
+      });
+
+      socket.on("userLeavesRoom", (roomUUID, user, currentTime) => {
+        const u = roomsCache[roomUUID].users.find(obj => obj.username == user.username);
+
+        if (roomsCache[roomUUID].users.indexOf(u) > -1) {
+          console.log(`Removing ${user.username} from room: ${roomUUID}`);
+          roomsCache[roomUUID].users.splice(roomsCache[roomUUID].users.indexOf(u), 1);
+          if (roomsCache[roomUUID].users.length == 0 && currentTime > 0) {
+            roomsCache[roomUUID]['currentTime'] = currentTime;
+          }
+          io.emit("userList", roomsCache[roomUUID].users);
+          io.emit("roomsUpdated", roomsCache);
+          socket.leave(roomUUID);
+        }
+      });
+
+
       // Send state to new client (only ran if admin is in room)
-      socket.on("sendState", data => {
-        var state = {
-          roomHlsUrl,
-          roomSubtitleUrl,
-          roomTime: data.time,
-          roomState: data.state,
-          roomPlaying
+      socket.on("sendState", (roomUUID, data) => {
+        // TODO these should just be read and written from the roomsCache
+        let state = {
+          'roomHlsUrl': roomsCache[roomUUID].roomHlsUrl,
+          // roomSubtitleUrl,
+          'roomTime': data.time,
+          'roomPaused': data.paused,
+          'roomPlaying': roomsCache[roomUUID].roomPlaying,
+
         };
         io.to(data.id).emit("setState", state);
       });
@@ -88,42 +146,41 @@ export default function() {
         io.emit("userList", users);
       });
 
-      socket.on("play", (time) => {
-        io.emit("serverPlay", time);
+      socket.on("play", (roomUUID, time) => {
+        io.to(roomUUID).emit("serverPlay", time);
       });
 
-      socket.on("pause", (time) => {
-        io.emit("serverPause", time);
+      socket.on("pause", (roomUUID, time) => {
+        io.to(roomUUID).emit("serverPause", time);
       });
 
-      socket.on("sync", (currentTime) => {
-        io.emit("serverSync", currentTime);
+      socket.on("sync", (roomUUID, currentTime) => {
+        io.to(roomUUID).emit("serverSync", currentTime);
       });
 
-      socket.on("changeStream", (newUUID, url, posterUrl) => {
-        // TODO ugly and non discriminate, will need to change when software handles mutliple rooms
-        for (let itemId in ffmpegJobQueue) {
-          console.log(`Checking ffmpegJobQueue for any existing transcode jobs that need to be cancelled`);
-          if (itemId != newUUID) {
-            console.log(`Cancelling ${itemId} transcode job`);
-            ffmpegJobQueue[itemId]['ffmpeg'].kill();
-            // ffmpegJobQueue[itemId]['ffmpeg'].kill('SIGINT');
-            // TODO just waiting 1000ms is a bit ugly
-            setTimeout(function(){
-              delete ffmpegJobQueue[itemId];
-              cleanUpffmpegDir(itemId);
-            },1000);
+      socket.on("changeStream", (roomUUID, url, posterUrl) => {
+        // TODO ugly to delete the folder ffmpeg is writing to, but seems to be the only way I can cancel it lol
+        for (let room in ffmpegJobQueue) {
+          console.log(`Checking ffmpegJobQueue[${roomUUID}] for any existing transcode jobs that need to be cancelled`);
+          if (room === roomUUID) {
+            console.log(`Cancelling ${roomUUID} transcode job`);
+            if (ffmpegJobQueue[roomUUID]['ffmpeg'] !== undefined) {
+              ffmpegJobQueue[roomUUID]['ffmpeg'].kill();
+              delete ffmpegJobQueue[roomUUID]['ffmpeg'];
+              cleanUpffmpegDir(roomUUID);
+            }
           }
         }
-        roomHlsUrl = url;
+        roomsCache[roomUUID].roomHlsUrl = url;
         if (posterUrl) {
-          io.emit("setPoster", posterUrl);
+          io.to(roomUUID).emit("setPoster", posterUrl);
         }
-        io.emit("setStream", url);
+        io.to(roomUUID).emit("setStream", url);
+        io.emit("roomsUpdated", roomsCache);
       });
 
-      socket.on("message", message => {
-        io.emit("sendMessage", message);
+      socket.on("message", (roomUUID, message) => {
+        io.to(roomUUID).emit("sendMessage", message);
       });
 
       socket.on("changeSubtitles", url => {
@@ -141,15 +198,24 @@ export default function() {
       //   io.emit("setNowPlaying", playing);
       // });
 
+      // relay room creation to all active clients
+      socket.on("newRoomCreated", () => {
+        io.emit("roomsUpdated", roomsCache);
+      });
+
       // On disconnect find and remove user from users array
       socket.on("disconnect", () => {
-        const u = users.find(obj => obj.id == socket.id);
+        for (let room in roomsCache) {
+          const u = roomsCache[room].users.find(obj => obj.id == socket.id);
 
-        if (users.indexOf(u) > -1) {
-          users.splice(users.indexOf(u), 1);
+          if (roomsCache[room].users.indexOf(u) > -1) {
+            console.log(`Removing ${u.username} from room: ${room}`);
+            roomsCache[room].users.splice(roomsCache[room].users.indexOf(u), 1);
+            io.emit("userList", roomsCache[room].users);
+            io.emit("roomsUpdated", roomsCache);
+            socket.leave(room);
+          }
         }
-
-        io.emit("userList", users);
       });
     });
 

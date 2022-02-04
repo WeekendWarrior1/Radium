@@ -9,11 +9,12 @@ const app = express();
 const auth = require("./routes/auth");
 const emotes = require("./routes/emotes");
 const jellyfin = require("./routes/jellyfin");
+const rooms = require("./routes/rooms");
 const { makeSureSegmentIsFinished, staticFileServe } = require("./routes/hls");
 
 app.use(cors({
 	origin: '*',
-	methods: ['GET', 'POST'],
+	methods: ['GET', 'POST', 'DELETE'],
 	allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-HTTP-Method-Override', 'Accept'],
 	credentials: true,
 }));
@@ -22,6 +23,7 @@ app.use(cors({
 app.use(auth);
 app.use(emotes);
 app.use(jellyfin);
+app.use(rooms);
 
 app.use(makeSureSegmentIsFinished);
 app.use(staticFileServe);

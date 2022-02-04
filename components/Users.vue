@@ -46,18 +46,18 @@ export default {
       isOpen: 1,
       collapses: [
         {
-          title: "Online Users"
-        }
+          title: "Online Room Users",
+        },
       ],
-      users: []
+      users: [],
     };
   },
   mounted() {
-    this.$root.mySocket.on("userList", users => {
-      this.users = users;
+    this.$root.mySocket.on("userList", (roomUUID, users) => {
+        this.users = users;
     });
   },
-  methods: {}
+  methods: {},
 };
 </script>
 

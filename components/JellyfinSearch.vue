@@ -81,8 +81,9 @@ export default {
     startMovie(item) {
       this.$root.mySocket.emit(
         "changeStream",
-        item.Id,
-        `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${item.Id}`,
+        this.$store.state.roomUUID,
+        // `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${item.Id}`,
+        `${this.$config.BASE_URL}/api/jellyfin/${this.$store.state.roomUUID}/${item.Id}/stream.m3u8`,
         item.BackdropImageTags.length
           ? `${this.$config.BASE_URL}/api/jellyfin/backdrop?item=${item.Id}&tag=${item.BackdropImageTags[0]}`
           : false

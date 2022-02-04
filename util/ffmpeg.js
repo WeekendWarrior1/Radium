@@ -12,15 +12,16 @@ const ffmpegJobQueue = {};
 
 exports.ffmpegJobQueue = ffmpegJobQueue;
 
-exports.startHLSstream = async function startHLSstream(itemId, mediaLocation, subtitleInfo) {
-    if (ffmpegJobQueue[itemId] == undefined) {
-        ffmpegJobQueue[itemId] = {};
+exports.startHLSstream = async function startHLSstream(roomUUID, itemId, mediaLocation, subtitleInfo) {
+    if (ffmpegJobQueue[roomUUID] == undefined) {
+        ffmpegJobQueue[roomUUID] = {};
     }
     let playlist = "";
-    let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${itemId}/`;
-    if (ffmpegJobQueue[itemId]['ffmpeg'] == undefined) {
-        ffmpegJobQueue[itemId]['ffmpeg'] = {};
-        console.log(`Starting ${itemId} transcode job`);
+    let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
+    if (ffmpegJobQueue[roomUUID]['ffmpeg'] === undefined && ffmpegJobQueue[roomUUID]['itemId'] !== itemId) {
+        ffmpegJobQueue[roomUUID]['ffmpeg'] = {};
+        ffmpegJobQueue[roomUUID]['itemId'] = itemId;
+        console.log(`Starting ${roomUUID} transcode job`);
         const mediaInfo = await ffprobeMediaInfo(mediaLocation);
         // console.log(mediaInfo);
         // console.log(subtitleInfo);
@@ -29,7 +30,7 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation, su
             await fs.promises.mkdir(workDir);
         } catch (error) {
             if (error.code === 'EEXIST') {
-                console.log(`'${itemId}' workdir already exists at: ${workDir}, removing all .ts and .m3u8 within...`)
+                console.log(`'${roomUUID}' workdir already exists at: ${workDir}, removing all .ts and .m3u8 within...`)
                 fs.readdirSync(workDir)
                     .filter(f => (f.endsWith('.ts') || f.endsWith('.m3u8') || f.endsWith('.vtt') || f == 'ffmpeg_finished'))
                     .map(f => fs.unlinkSync(workDir + f))
@@ -43,17 +44,17 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation, su
         // would mean I don't have to make sure segments exist when a client retrieves them
         // as long as video.js knows to keep redownloading the m3u8 based on it's stream header
         // also means I can copy a video stream instead of reencoding it for new keyframes
-        playlist = await createHLSPlayList(workDir, 'playlist', itemId, mediaInfo, subtitleInfo);
-        ffmpegJobQueue[itemId]['playlist'] = playlist;
+        playlist = await createHLSPlayList(workDir, 'playlist', roomUUID, mediaInfo, subtitleInfo);
+        ffmpegJobQueue[roomUUID]['playlist'] = playlist;
 
-        ffmpegJobQueue[itemId]['ffmpeg'] = startffmpegHLSTranscode(transcodeStringBuilder(mediaInfo, mediaLocation, false, workDir), workDir, itemId);
+        ffmpegJobQueue[roomUUID]['ffmpeg'] = startffmpegHLSTranscode(transcodeStringBuilder(mediaInfo, mediaLocation, false, workDir), workDir, roomUUID);
     } else {
-        while (ffmpegJobQueue[itemId]['playlist'] == undefined) {
+        while (ffmpegJobQueue[roomUUID]['playlist'] === undefined) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
-        playlist = ffmpegJobQueue[itemId]['playlist'];
-        // if (ffmpegJobQueue[itemId]['playlist']) {
-        //     playlist = ffmpegJobQueue[itemId]['playlist'];
+        playlist = ffmpegJobQueue[roomUUID]['playlist'];
+        // if (ffmpegJobQueue[roomUUID]['playlist']) {
+        //     playlist = ffmpegJobQueue[roomUUID]['playlist'];
         // } else {
         //     // have to add a wait here until file exists
         //     // TODO ugly
@@ -64,9 +65,9 @@ exports.startHLSstream = async function startHLSstream(itemId, mediaLocation, su
     return playlist;
 }
 
-// TODO sanitise itemId string
-function cleanUpffmpegDir(itemId) {
-    let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${itemId}/`;
+// TODO sanitise roomUUID string
+function cleanUpffmpegDir(roomUUID) {
+    let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
     console.log(`Deleting ${workDir}...`)
     fs.rmSync(workDir, { recursive: true, force: true });
 }
@@ -151,7 +152,7 @@ async function ffprobeMediaInfo(video_input) {
     }
 }
 
-async function createHLSPlayList(destination, playlist_filename, itemId, mediaInfo, subtitleInfo) {
+async function createHLSPlayList(destination, playlist_filename, roomUUID, mediaInfo, subtitleInfo) {
     const duration = mediaInfo.format.duration;
 
     let playlistM3U8 = `#EXTM3U
@@ -160,11 +161,11 @@ async function createHLSPlayList(destination, playlist_filename, itemId, mediaIn
         // add each subtitle to playlist m3u8
         sub.hls_playlist_name = `${sub.Language}${(sub.IsForced)? `_forced` : ``}${(sub.Title)? `- ${sub.Title}` : ``}`;
         sub.hls_serve_file = sub.DeliveryUrl.split('/Videos/')[1].split('?')[0];
-        playlistM3U8 += `\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${sub.hls_playlist_name}",DEFAULT=${sub.IsDefault?'YES':'NO'},AUTOSELECT=NO,URI="${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${sub.hls_playlist_name}.m3u8"`
-        // playlistM3U8 += `\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${sub.hls_playlist_name}",DEFAULT=${sub.IsDefault?'YES':'NO'},AUTOSELECT=NO,URI="${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/${sub.hls_playlist_name}.m3u8"`
+        playlistM3U8 += `\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${sub.hls_playlist_name}",DEFAULT=${sub.IsDefault?'YES':'NO'},AUTOSELECT=NO,URI="${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${roomUUID}/${sub.hls_playlist_name}.m3u8"`
+        // playlistM3U8 += `\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="${sub.hls_playlist_name}",DEFAULT=${sub.IsDefault?'YES':'NO'},AUTOSELECT=NO,URI="${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${roomUUID}/${sub.hls_playlist_name}.m3u8"`
     }
     playlistM3U8 += `\n#EXT-X-STREAM-INF:BANDWIDTH=1400000,RESOLUTION=${mediaInfo.streams[0].width}x${mediaInfo.streams[0].height}${(subtitleInfo.length) ? `,SUBTITLES="subs"` : ``}
-${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${itemId}/stream0.m3u8`
+${config.default.publicRuntimeConfig.HLS_STREAM_ROOT}${roomUUID}/stream0.m3u8`
 
 
     let segmentM3U8 = `#EXTM3U
@@ -210,7 +211,7 @@ ${config.default.publicRuntimeConfig.BASE_URL}/api/jellyfin/subtitlestream/${sub
     return playlistM3U8;
 }
 
-function startffmpegHLSTranscode(ffmpegCommand, destination, itemId) {
+function startffmpegHLSTranscode(ffmpegCommand, destination, roomUUID) {
     // TODO: can send abortsignal
     // const ac = new AbortController();
     // const { signal } = ac;
@@ -220,7 +221,9 @@ function startffmpegHLSTranscode(ffmpegCommand, destination, itemId) {
             console.error(`exec error: ${error}`);
             return;
         }
-        delete ffmpegJobQueue[itemId];
+        // delete ffmpegJobQueue[roomUUID];
+        // lol instead of deleting the room ffmpeg object, we will just reset the ffmpeg job when the transcode is finished
+        ffmpegJobQueue[roomUUID]['ffmpeg'] = undefined;
         child_process.exec(`touch ${destination}/ffmpeg_finished`, (error, stdout, stderr) => {
             if (error) {
                 console.error(`exec error: ${error}`);

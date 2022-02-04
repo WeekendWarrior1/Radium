@@ -3,6 +3,7 @@ export const state = () => ({
   chat: true,
   authorized: false,
   token: null,
+  roomUUID: null,
   user: {
     username: null,
     color: null,
@@ -33,5 +34,8 @@ export const mutations = {
   },
   setToken(state, token) {
     state.token = token;
+  },
+  setRoomUUID(state, roomUUID) {
+    state.roomUUID = roomUUID;
   }
 };

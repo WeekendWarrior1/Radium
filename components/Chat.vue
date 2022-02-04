@@ -120,7 +120,7 @@ export default {
               message: result,
               user: this.$store.state.user
             };
-            this.$root.mySocket.emit("message", message);
+            this.$root.mySocket.emit("message", this.$store.state.roomUUID, message);
             this.message = "";
           }
       }

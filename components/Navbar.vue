@@ -2,7 +2,7 @@
   <div>
     <b-navbar type="is-dark" class="radium-navbar">
       <template slot="brand">
-        <b-navbar-item tag="router-link" :to="{ path: '/' }">
+        <b-navbar-item @click="leaveRoom">
           <img src="/logo.png" alt="Radium" />
         </b-navbar-item>
       </template>
@@ -14,17 +14,17 @@
         >
           🔒 Protect
         </b-navbar-item>
-        <b-navbar-item @click="info">
+        <b-navbar-item v-if="$nuxt.$route.name != 'index'" @click="info">
           <b-icon icon="information-outline"></b-icon>
         </b-navbar-item>
-        <b-navbar-item @click="nowplaying">
+        <b-navbar-item v-if="$nuxt.$route.name != 'index'" @click="nowplaying">
           <b-icon
             icon="cursor-default-click-outline"
             class="now-playing-icon"
           ></b-icon
           >Now Playing
         </b-navbar-item>
-        <b-navbar-item @click="jellyfin">
+        <b-navbar-item v-if="$nuxt.$route.name != 'index'" @click="jellyfin">
           <!-- <span> -->
             <img src="/jellyfin-icon-transparent.svg" alt="jellyfin">
           <!-- </span> -->
@@ -35,32 +35,8 @@
       <template slot="end">
         <b-navbar-item tag="div">
           <div class="buttons">
-            <!-- <button class="button is-dark" @click="play">
-              <b-icon icon="play"></b-icon>
-            </button>
-            <button class="button is-dark" @click="pause">
-              <b-icon icon="pause"></b-icon>
-            </button> -->
-            <button
-              v-if="$store.state.user.admin"
-              class="button is-dark"
-              @click="sync"
-            >
-              <b-icon icon="sync"></b-icon>
-            </button>
             <b-tooltip
-              v-else
-              label="Only admins can sync the room"
-              type="is-success"
-              position="is-left"
-              class="sync-tooltip"
-            >
-              <button class="button is-dark" disabled>
-                <b-icon icon="sync"></b-icon>
-              </button>
-            </b-tooltip>
-            <b-tooltip
-              v-if="this.$store.state.chat"
+              v-if="this.$store.state.chat && $nuxt.$route.name != 'index'"
               label="Hide Chat"
               :delay="500"
               position="is-left"
@@ -71,7 +47,7 @@
               </button>
             </b-tooltip>
             <b-tooltip
-              v-else
+              v-if="!this.$store.state.chat && $nuxt.$route.name != 'index'"
               label="Show Chat"
               :delay="500"
               position="is-left"
@@ -120,16 +96,7 @@ export default {
     });
   },
   methods: {
-    play() {
-      this.$root.mySocket.emit("play");
-    },
-    pause() {
-      this.$root.mySocket.emit("pause");
-    },
-    sync() {
-      this.$root.mySocket.emit("sync");
-    },
-    toggleChat: function() {
+    toggleChat() {
       this.$store.commit("toggleChat");
     },
     info() {
@@ -140,7 +107,20 @@ export default {
     },
     jellyfin() {
       $nuxt.$emit("jellyfin");
-    }
+    },
+    async leaveRoom() {
+      // console.log(videojs(document.getElementById('video')).currentTime());
+      let currentTime = 0;
+      try {
+        currentTime = await videojs(document.getElementById('video')).currentTime();
+      } catch {
+        console.log("Couldn't grab video element, likely not loaded");
+      }
+      if (this.$store.state.roomUUID && this.$store.state.user) {
+        this.$root.mySocket.emit("userLeavesRoom", this.$store.state.roomUUID, this.$store.state.user, currentTime);
+      }
+      this.$router.push(`/`);
+    },
   }
 };
 </script>

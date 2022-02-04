@@ -66,7 +66,25 @@ export default {
         hid: "description",
         name: "description",
         content: process.env.npm_package_description || ""
-      }
+      },
+    ],
+    script: [
+      // p2p (webtorrent) media distribution
+      { src: 'https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js', /*async: true, defer: true*/ },
+      { src: 'https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js', /*async: true, defer: true*/ },
+
+      // video.js
+      // 16 seems to be latest that p2p works with contrib-hls
+      // { src: 'https://vjs.zencdn.net/7.16.0/video.min.js', /*async: true, defer: true*/ },
+      // { src: 'https://vjs.zencdn.net/7.17.0/video.min.js', /*async: true, defer: true*/ },
+      { src: '/video.min.js', /*async: true, defer: true*/ },
+      // { src: '/video.js', /*async: true, defer: true*/ },
+
+      // hls tech
+      // 0.8.9 ?
+      // { src: 'https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest', /*async: true, defer: true*/ },
+      // { src: 'https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js', /*async: true, defer: true*/ },
+      { src: '/videojs-hlsjs-plugin.js', /*async: true, defer: true*/ },
     ],
     link: [{ rel: "icon", type: "image/x-icon", href: "/favicon.ico" }]
   },

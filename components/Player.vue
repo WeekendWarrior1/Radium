@@ -19,40 +19,40 @@
 // import Playing from "../components/Playing";
 
 export default {
-  head() {
-    return {
-      script: [
-        {
-          src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js",
-        },
-        {
-          src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js",
-          // src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.js",
-        },
-        // {
-        //   src: "https://cdn.jsdelivr.net/npm/hls.js@latest"
-        // },
-        {
-          //16 seems to be latest that p2p works with contrib-hls
-          // src: "https://vjs.zencdn.net/7.16.0/video.min.js",
-
-          // src: "https://vjs.zencdn.net/7.17.0/video.min.js",
-          src: "/video.min.js",
-        },
-        {
-          // 0.8.9 ?
-          // src: "https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest",
-
-          // src: "https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js",
-          src: "/videojs-hlsjs-plugin.js"
-        },
-      ],
-    };
-  },
+  // head() {
+  //   return {
+  //     script: [
+  //       {
+  //         src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-core@latest/build/p2p-media-loader-core.min.js",
+  //       },
+  //       {
+  //         src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.min.js",
+  //         // src: "https://cdn.jsdelivr.net/npm/p2p-media-loader-hlsjs@latest/build/p2p-media-loader-hlsjs.js",
+  //       },
+  //       // {
+  //       //   src: "https://cdn.jsdelivr.net/npm/hls.js@latest"
+  //       // },
+  //       {
+  //         //16 seems to be latest that p2p works with contrib-hls
+  //         // src: "https://vjs.zencdn.net/7.16.0/video.min.js",
+  //         // src: "https://vjs.zencdn.net/7.17.0/video.min.js",
+  //         src: "/video.min.js",
+  //       },
+  //       {
+  //         // 0.8.9 ?
+  //         // src: "https://cdn.jsdelivr.net/npm/videojs-contrib-hls.js@latest",
+  //         // src: "https://cdn.streamroot.io/videojs-hlsjs-plugin/1/stable/videojs-hlsjs-plugin.js",
+  //         src: "/videojs-hlsjs-plugin.js"
+  //       },
+  //     ],
+  //   };
+  // },
   data() {
     return {
       player: null,
       // subtitleUrl: `${this.$config.BASE_URL}/subs.vtt`,
+      engine: null,
+      syncTimer: null,
     };
   },
   mounted() {
@@ -63,7 +63,7 @@ export default {
           : ["wss://tracker.novage.com.ua", "wss://tracker.openwebtorrent.com"],
       },
     };
-    let engine = new p2pml.hlsjs.Engine(config);
+    this.engine = new p2pml.hlsjs.Engine(config);
 
     let playerOptions = {
       autoplay: false,
@@ -75,12 +75,14 @@ export default {
         //   overrideNative: false,
         hlsjsConfig: {
           liveSyncDurationCount: 7, // To have at least 7 segments in queue
-          loader: engine.createLoaderClass(),
+          // loader: engine.createLoaderClass(),
+          loader: this.engine.createLoaderClass(),
         },
       },
       sources: [
         // {
-        //   src: this.$config.HLS_URL,
+        //   // src: this.$config.HLS_URL,
+        //   src: "http://d2zihajmogu5jn.cloudfront.net/bipbop-advanced/bipbop_16x9_variant.m3u8",
         //   type: "application/x-mpegURL",
         // },
       ],
@@ -124,26 +126,32 @@ export default {
 
     //add play pause listener
     this.player.on("playButton", (event, time) => {
-      this.$root.mySocket.emit("play", time);
+      this.$root.mySocket.emit("play", this.$store.state.roomUUID, time);
     });
 
     this.player.on("pauseButton", (event, time) => {
-      this.$root.mySocket.emit("pause", time);
+      this.$root.mySocket.emit("pause", this.$store.state.roomUUID, time);
     });
 
-    // set promise here
     this.player.on("seekBar", (event, time) => {
-      this.$root.mySocket.emit("sync", time);
+      this.$root.mySocket.emit("sync", this.$store.state.roomUUID, time);
       // if buffering, have to wait for chunk to finish and then sync again
-      // if seeked a second time whilst this promise is still pending, cancel it
+
+
+      // if seeked a second time whilst this timer is still pending, clear it
+      clearTimeout(this.syncTimer);
+      this.syncTimer = setTimeout(function () {
+        // seems this.$root becomes this.$nuxt.$root in this scope
+        this.$nuxt.$root.mySocket.emit("sync", this.$nuxt.$store.state.roomUUID, videojs(document.getElementById('video')).currentTime());
+      }, 5000);
     });
 
     // p2pml.hlsjs.initVideoJsContribHlsJsPlayer(this.player);
     p2pml.hlsjs.initVideoJsHlsJsPlugin();
 
-    // engine.on("peer_connect", (peer) => console.log("peer_connect", peer));
-    // engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
-    // engine.on("segment_loaded", (segment, peerId) =>
+    // this.engine.on("peer_connect", (peer) => console.log("peer_connect", peer));
+    // this.engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
+    // this.engine.on("segment_loaded", (segment, peerId) =>
     //   console.log(
     //     "segment_loaded from",
     //     peerId ? `peer ${peerId}` : "HTTP",
@@ -166,22 +174,21 @@ export default {
 
     this.player.volume(1);
 
-    // Send player state to server for new client
-    this.$root.mySocket.on("requestState", async (id) => {
-      this.$root.mySocket.emit("sendState", {
+    // Player state has been requested
+    this.$root.mySocket.on("requestState", async (roomUUID, id) => {
+      this.$root.mySocket.emit("sendState", roomUUID, {
         time: this.player.currentTime(),
-        state: this.player.paused(),
+        paused: this.player.paused(),
         id: id,
       });
       // wait 5 seconds and repeat a second time to ensure sync on buffered client
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      this.$root.mySocket.emit("sync", this.player.currentTime());
+      this.$root.mySocket.emit("sync", roomUUID, this.player.currentTime());
     });
 
-    // If new client, set state from server
+    // Player state received from another Client
     this.$root.mySocket.on("setState", (state) => {
       // Set HLS stream
-      console.log("If new client, set state from server", state);
       if (state.roomHlsUrl) {
         this.player.src(state.roomHlsUrl);
       }
@@ -216,10 +223,9 @@ export default {
         this.player.currentTime(state.roomTime);
       }
       // Set player state
-      if (state.roomState == true) {
+      if (state.roomPaused == true) {
         this.player.pause();
-      }
-      if (state.roomState == false) {
+      } else {
         this.player.play();
       }
       // Set Now Playing
@@ -228,7 +234,60 @@ export default {
 
     // Change HLS Stream
     this.$root.mySocket.on("setStream", (url) => {
-      this.player.src(url);
+      // console.log("before", this.player.remoteTextTracks().tracks_);
+      // let oldTracks = this.player.remoteTextTracks().tracks_;
+
+      // for (let i in oldTracks) {
+      //   console.log(i);
+      //   this.player.removeRemoteTextTrack(oldTracks[i]);
+      // }
+
+      // // var i = oldTracks.length;
+      // console.log("oldTracks",oldTracks);
+
+      // // while (i--) {
+      // //   this.player.removeRemoteTextTrack(oldTracks[i]);
+      // // }
+      // for (let i in oldTracks) {
+      //   console.log(i);
+      //   this.player.removeRemoteTextTrack(oldTracks[i]);
+      // }
+      // this.player.remoteTextTracks().tracks_ = [];
+      // console.log('textTracks',this.player.textTracks());
+      // console.log('remoteTextTrackEls',this.player.remoteTextTrackEls().trackElements_);
+      // console.log('remoteTextTracks',this.player.remoteTextTracks());
+      // let oldTracks = this.player.remoteTextTrackEls().trackElements_;
+      // let oldTracks = this.player.remoteTextTrackEls();
+      // let oldTracks = this.player.remoteTextTracks().tracks_;
+      // for (let track of oldTracks) {
+      //   // this.player.removeRemoteTextTrack(track);
+      //   // oldTracks.removeTrack(track);
+      // }
+
+      // this.player.src(url);
+      this.player.src({ type: "application/vnd.apple.mpegurl", src: url });
+      // console.log('attempt to access tech',this.player.tech());
+      // this.player.ready(function() {
+      //   console.log('test ready listener on source change',tech);
+      //   // tech() will log warning without any argument
+      //   // var tech = myPlayer.tech(false);
+      // });
+      // this.player.tech()._updateTextTrackList();
+      //   this.player.dispose();
+      //   playerOptions.sources = [
+      //     {
+      //       src: url,
+      //       type: "application/vnd.apple.mpegurl",
+      //     },
+      //   ],
+
+      // this.player = videojs(
+      //   this.$refs.videoPlayer,
+      //   playerOptions
+      // );
+      // p2pml.hlsjs.initVideoJsHlsJsPlugin();
+
+      // console.log("after", this.player.remoteTextTrackEls());
       // Toast notification
       this.$buefy.toast.open({
         duration: 2000,
@@ -304,25 +363,30 @@ export default {
     // on sendSync from server
     this.$root.mySocket.on("serverSync", (currentTime) => {
       this.player.currentTime(currentTime);
-      // this.$buefy.toast.open({
-      //   duration: 100,
-      //   message: `Syncing`,
-      //   position: "is-bottom",
-      // });
     });
-  
+
     // on setPoster from stream
-  //setPoster
     this.$root.mySocket.on("setPoster", (url) => {
-      console.log("setPoster", url);
-        this.player.poster(url);
+      this.player.poster(url);
     });
   },
-
-  beforeDestroy() {
+  async beforeDestroy() {
     if (this.player) {
-      this.player.dispose();
+      await this.player.dispose();
     }
+    if (this.engine) {
+      await this.engine.destroy();
+    }
+
+    //remove all socket listeners
+    this.$root.mySocket.off("requestState");
+    this.$root.mySocket.off("setState");
+    this.$root.mySocket.off("setStream");
+    this.$root.mySocket.off("setSubtitles");
+    this.$root.mySocket.off("serverPlay");
+    this.$root.mySocket.off("serverPause");
+    this.$root.mySocket.off("serverSync");
+    this.$root.mySocket.off("setPoster");
   },
 };
 </script>

@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const fetch = require("node-fetch");
 const retryFetch = require('fetch-retry')(fetch);
+import { validate as uuidValidate } from 'uuid';
 
 const router = Router();
 const { ffmpegJobQueue, startHLSstream, ffmpegConvertSubtitles } = require('../../util/ffmpeg');
@@ -119,26 +120,26 @@ router.get("/jellyfin/episodes", async function (req, res, next) {
     }
 });
 
-// router.get(["/jellyfin/stream","/jellyfin/stream/:item"], async function (req, res, next) {
-// TODO make `/jellyfin/stream/itemId.m3u8`
-router.get(["/jellyfin/stream.m3u8"], async function (req, res, next) {
+router.get(["/jellyfin/:roomUUID/:item/stream.m3u8"], async function (req, res, next) {
     try {
-        if (req.query.item === undefined) {
-            throw new Error(`Key "item" not found in query parameters`);
+        if (req.params.item === undefined) {
+            throw new Error(`Paramater "item" not found in query parameters`);
         }
-        //attempt sanitise
-        if (req.query.item.includes('"') || req.query.item.includes('-') || req.query.item.includes(' ') || req.query.item.includes('|') || req.query.item.includes('&') || req.query.item.includes('/')) {
-            throw new Error(`Don't even try it`);
+        if (req.params.roomUUID === undefined) {
+            throw new Error(`Paramater "roomUUID" not found in query parameters`);
         }
-        let subtitlesStreams = await jellyfinGetSubtitles(req.query.item);
+        if (!uuidValidate(req.params.roomUUID)) {
+            throw new Error('Invalid room UUID');
+        }
+        let subtitlesStreams = await jellyfinGetSubtitles(req.params.item);
 
-        let playlist = await startHLSstream(req.query.item,`${config.default.publicRuntimeConfig.JELLYFIN_BASE_URI}/Items/${req.query.item}/Download?api_key=${config.default.publicRuntimeConfig.JELLYFIN_API_KEY}`, subtitlesStreams);
+        let playlist = await startHLSstream(req.params.roomUUID, req.params.item,`${config.default.publicRuntimeConfig.JELLYFIN_BASE_URI}/Items/${req.params.item}/Download?api_key=${config.default.publicRuntimeConfig.JELLYFIN_API_KEY}`, subtitlesStreams);
 
         res.header('Content-type', 'application/vnd.apple.mpegurl');
         res.send(playlist);
 
     } catch (error) {
-        if (error.message.includes("not found in query parameters") || error.message.includes(`Don't even try it`)) {
+        if (error.message.includes("not found in query parameters") || error.message == `Invalid room UUID`) {
             res.status(400).send(error.message);
         } else {
             res.status(500).send(error.message);
