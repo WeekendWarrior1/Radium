@@ -1,29 +1,49 @@
 <template>
-  <div v-if="nowplaying" class="playing">
-    <div class="movie">
-      <div class="movie__poster">
-        <img v-bind:src="media.Poster" />
-      </div>
-      <div>
-        <h2 class="movie__title">
-          <div>{{ media.Title }} ({{ media.Year }})</div>
-          <div class="movie__rating">{{ media.Rated }}</div>
-        </h2>
-        <p class="movie__genres">{{ media.Genre }}</p>
-        <p class="movie__time">{{ media.Runtime }}</p>
-        <div class="movie__stars">
-          <p>
-            IMDb Rating
-            <b-icon icon="star" size="is-small"></b-icon>
-            {{ media.imdbRating }} / 10
-          </p>
+  <!-- <div v-if="nowplaying" class="playing"> -->
+  <v-expand-transition>
+    <v-card v-if="nowplaying" style="position: absolute; right: 0; left: 0; z-index: 1;">
+      <v-container fluid>
+        <!-- <v-row> -->
+        <div style="display: flex;">
+          <!-- <v-col cols="12" sm="5" md="4" lg="4" xl="3"> -->
+          <!-- <v-col> -->
+            <div class="movie__poster">
+              <img v-bind:src="media.Poster" />
+            </div>
+          <!-- </v-col> -->
+          <!-- <v-col cols="12" sm="5" md="4" lg="4" xl="3"> -->
+          <!-- <v-col> -->
+            <div>
+              <h2 class="movie__title">
+                <div>
+                  {{
+                    media.SeriesName
+                      ? `${media.SeriesName}: `
+                      : ""
+                  }}{{ media.Title }} ({{ media.Year }})
+                </div>
+                <div class="movie__rating">{{ media.Rated }}</div>
+              </h2>
+              <p class="movie__genres">{{ media.Genre }}</p>
+              <p class="movie__time">{{ media.Runtime }}</p>
+              <div class="movie__stars">
+                <p>
+                  IMDb Rating
+                  <b-icon icon="star" size="is-small"></b-icon>
+                  {{ media.imdbRating }} / 10
+                </p>
 
-          <!-- <i class="fa fa-star-o" v-for="n in movieData.score.empty" aria-hidden="true"></i> -->
-        </div>
-        <p class="movie__plot">{{ media.Plot }}</p>
-      </div>
-    </div>
-  </div>
+                <!-- <i class="fa fa-star-o" v-for="n in movieData.score.empty" aria-hidden="true"></i> -->
+              </div>
+              <p class="movie__plot">{{ media.Plot }}</p>
+            </div>
+          <!-- </v-col> -->
+        </div>  
+        <!-- </v-row> -->
+      </v-container>
+    </v-card>
+  </v-expand-transition>
+  <!-- </div> -->
 </template>
 
 <script>
@@ -38,23 +58,30 @@ export default {
         Rated: "PG",
         Runtime: "42 min",
         Genre: "VueJS, Javascript, Socket.IO, HLS",
-        Plot:
-          "Enter the TV Show or Movie below the player, in the advanced controls, to let the room know what's streaming.",
-        imdbRating: "9.3"
-      }
+        Plot: "Enter the TV Show or Movie below the player, in the advanced controls, to let the room know what's streaming.",
+        imdbRating: "9.3",
+      },
     };
   },
   mounted() {
     // Now playing banner
-    this.$nuxt.$on("nowplaying", () => {
-      this.nowplaying = !this.nowplaying;
+    this.$nuxt.$on("nowplaying", (hoveringOverTitle) => {
+      this.nowplaying = hoveringOverTitle;
     });
-    this.$root.mySocket.on("setNowPlaying", playing => {
-      this.fetchPlaying(playing);
+    this.$root.mySocket.on("setNowPlaying", (mediaInfo) => {
+      // this.fetchPlaying(playing);
+      this.media = mediaInfo;
+      this.$store.commit("setRoomPlayingTitle", 
+      { title: (this.media.SeriesName) ? `${this.media.SeriesName} - ${this.media.Title}` : this.media.Title, 
+        roomUUID: this.$store.state.roomUUID });
     });
     // if client joins room late
-    this.$nuxt.$on("setPlaying", playing => {
-      this.fetchPlaying(playing);
+    this.$nuxt.$on("setPlaying", (mediaInfo) => {
+      // this.fetchPlaying(playing);
+      this.media = mediaInfo;
+      this.$store.commit("setRoomPlayingTitle", 
+      { title: (this.media.SeriesName) ? `${this.media.SeriesName} - ${this.media.Title}` : this.media.Title, 
+        roomUUID: this.$store.state.roomUUID });
     });
   },
   methods: {
@@ -71,7 +98,7 @@ export default {
               duration: 2000,
               message: `Can't find ${playing}`,
               position: "is-bottom",
-              type: "is-danger"
+              type: "is-danger",
             });
           } else {
             this.media = res.data;
@@ -80,7 +107,7 @@ export default {
               duration: 2000,
               message: `Now Playing ${playing}`,
               position: "is-bottom",
-              type: "is-success"
+              type: "is-success",
             });
           }
         }
@@ -91,11 +118,11 @@ export default {
           duration: 2000,
           message: `Error`,
           position: "is-bottom",
-          type: "is-warning"
+          type: "is-warning",
         });
       }
-    }
-  }
+    },
+  },
 };
 </script>
 

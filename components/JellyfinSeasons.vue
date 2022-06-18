@@ -1,19 +1,31 @@
 <template>
-  <div class="playing">
-    <div v-if="seasonsVisible" class="movie scrollable">
-      <div v-for="item in seasons.Items" v-bind:key="item.Id">
-        <div class="movie__poster">
-          <!-- TODO: fallback to tv show poster if series poster can't be found -->
-          <a v-on:click="searchJellyfinEpisodes(item.SeriesId, item.Id)">
-            <img
-              v-bind:src="`${parent.$config.BASE_URL}/api/jellyfin/poster?item=${item.Id}&tag=${item.ImageTags.Primary}`"
-            />
-          </a>
-        </div>
+  <v-expand-transition>
+    <!-- <div class="playing"> -->
+    <v-card>
+      <!-- <div v-if="seasonsVisible" class="movie scrollable"> -->
+      <div v-if="seasonsVisible" class="scrollable" style="padding: 12px 20px 12px 12px;">
+        <v-slide-group
+          multiple
+          show-arrows
+        >
+          <!-- <div v-for="item in seasons.Items" v-bind:key="item.Id"> -->
+          <v-slide-item v-for="item in seasons.Items" v-bind:key="item.Id">
+            <div class="movie__poster">
+              <!-- TODO: fallback to tv show poster if series poster can't be found -->
+              <a v-on:click="searchJellyfinEpisodes(item.SeriesId, item.Id)">
+                <img
+                  v-bind:src="`${parent.$config.BASE_URL}/api/jellyfin/poster?item=${item.Id}&tag=${item.ImageTags.Primary}`"
+                />
+              </a>
+            </div>
+          </v-slide-item>
+          <!-- </div> -->
+        </v-slide-group>
       </div>
-    </div>
-    <JellyfinEpisodes />
-  </div>
+      <JellyfinEpisodes />
+    </v-card>
+    <!-- </div> -->
+  </v-expand-transition>
 </template>
 
 <script>

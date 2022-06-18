@@ -1,152 +1,123 @@
 <template>
-  <div v-if="jellyfin" class="playing">
-    <div class="movie">
-      <!-- <div class="movie__poster">
-        <img v-bind:src="media.Poster" />
-      </div>
-      <div>
-        <h2 class="movie__title">
-          <div>{{ media.Title }} ({{ media.Year }})</div>
-          <div class="movie__rating">{{ media.Rated }}</div>
-        </h2>
-        <p class="movie__genres">{{ media.Genre }}</p>
-        <p class="movie__time">{{ media.Runtime }}</p>
-        <div class="movie__stars">
-          <p>
-            IMDb Rating
-            <b-icon icon="star" size="is-small"></b-icon>
-            {{ media.imdbRating }} / 10
-          </p>
+  <v-expand-transition>
+    <v-card v-if="jellyfinSearch" style="position: absolute; right: 0; left: 0; z-index: 1;">
+      <v-container fluid style="margin-bottom: -8px;">
+        <!-- -20px margin to avoid the message field under input and radio buttons -->
+        <v-row>
+          <v-col cols="12" sm="5" md="4" lg="4" xl="3">
+            <v-text-field
+              v-model="jellyfinQuery"
+              v-on:keyup.enter="searchJellyfin"
+              label="Search Jellyfin Server for Media"
+              outlined
+              dense
+              hide-details
+              ref="jellyfinSearchInput"
+            ></v-text-field>
+          </v-col>
 
-        </div>
-        <p class="movie__plot">{{ media.Plot }}</p>
-      </div>
-    </div> -->
-      <form v-on:submit.prevent>
-        <label class="label has-text-white"
-          >Search Jellyfin Server for Media</label
-        >
-        <div class="field is-grouped">
-          <p class="control is-expanded">
-            <input v-model="jellyfinQuery" class="input" type="text" v-on:keyup.enter="searchJellyfin" />
-          </p>
+          <v-col cols="12" sm="5" md="5" lg="4" xl="3">
+            <v-radio-group v-model="searching" row style="margin-top: 0px">
+              <v-radio
+                label="Movies"
+                value="Movie"
+                color="primary"
+              ></v-radio>
+              <v-radio
+                label="Both"
+                value="Movie,Series"
+                color="primary"
+              ></v-radio>
+              <v-radio
+                label="TeeVee"
+                value="Series"
+                color="primary"
+              ></v-radio>
+            </v-radio-group>
+          </v-col>
 
-          <input
-            type="radio"
-            id="movies"
-            name="searching"
-            value="Movie"
-            v-model="searching"
-          />
-          <label class="label has-text-white" for="movies">Movies</label><br />
-          <input
-            type="radio"
-            id="both"
-            name="searching"
-            value="Movie,Series"
-            v-model="searching"
-          />
-          <label class="label has-text-white" for="both">Both</label><br />
-          <input
-            type="radio"
-            id="series"
-            name="searching"
-            value="Series"
-            v-model="searching"
-            checked="checked"
-          />
-          <label class="label has-text-white" for="series">TeeVee</label>
-          <div>
-            <p class="control">
-              <a type="button" class="button is-black" @click="searchJellyfin">Search</a>
-            </p>
-          </div>
-        </div>
-      </form>
-    </div>
-    <JellyfinSearch />
-  </div>
+          <v-col cols="12" sm="2" md="2" lg="2" xl="2">
+            <v-btn @click="searchJellyfin" text color="primary" elevation="3"> Search </v-btn>
+          </v-col>
+        </v-row>
+      <!-- </v-container> -->
+
+        <JellyfinExpansion
+          v-if="jellyfinExpansionVisible && jellyfinMedia.TotalRecordCount"
+          :media="jellyfinMedia"
+        ></JellyfinExpansion>
+      </v-container>
+    </v-card>
+  </v-expand-transition>
 </template>
 
 <script>
-import JellyfinSearch from "./JellyfinSearch.vue";
+import JellyfinExpansion from "./JellyfinExpansion.vue";
 export default {
-  components: { JellyfinSearch },
+  components: { JellyfinExpansion },
   data() {
     return {
-      jellyfin: false,
+      jellyfinSearch: false,
       jellyfinQuery: "",
       searching: "Movie,Series",
-      // JellyfinSearch: false,
-      // jellyfinJson: {},
+      jellyfinExpansionVisible: false,
+      jellyfinMedia: {},
     };
   },
   mounted() {
     // Now playing banner
-    this.$nuxt.$on("jellyfin", () => {
-      // this.$nuxt.$emit("nowplaying");
-      this.jellyfin = !this.jellyfin;
-      // this.JellyfinSearch = false;
-    });
-    this.$nuxt.$on("hideJellyfin", () => {
-      this.jellyfin = false;
-    });
-    this.$nuxt.$on("infoModal", () => {
-      this.infoModal = true;
-    });
-    this.$root.mySocket.on("setNowPlaying", (playing) => {
-      this.fetchPlaying(playing);
-    });
-    // if client joins room late
-    this.$nuxt.$on("setPlaying", (playing) => {
-      this.fetchPlaying(playing);
-    });
-  },
-  methods: {
-    async fetchPlaying(playing) {
-      try {
-        if (playing == null) {
-        } else {
-          var res = await this.$axios.get(
-            `https://www.omdbapi.com?apikey=${this.$config.OMDB_API_KEY}&t=${playing}`
-          );
-          if (res.data.Error == "Movie not found!") {
-            $nuxt.$emit("stopLoading");
-            this.$buefy.toast.open({
-              duration: 2000,
-              message: `Can't find ${playing}`,
-              position: "is-bottom",
-              type: "is-danger",
-            });
-          } else {
-            this.media = res.data;
-            $nuxt.$emit("stopLoading");
-            this.$buefy.toast.open({
-              duration: 2000,
-              message: `Now Playing ${playing}`,
-              position: "is-bottom",
-              type: "is-success",
-            });
+    this.$nuxt.$on("jellyfinSearch", () => {
+      this.jellyfinSearch = !this.jellyfinSearch;
+
+      // alert navbar and player of jellyfin state
+      $nuxt.$emit("jellyfinSearchState", this.jellyfinSearch );
+
+      // focus search field
+      if (this.jellyfin) {
+        this.$nextTick(() => {
+          if (this.$refs.jellyfinSearchInput) {
+            const input = this.$refs.jellyfinSearchInput.$el.querySelector('input:not([type=hidden]),textarea:not([type=hidden])')
+            if (input) {
+              setTimeout(() => {
+                input.focus()
+                input.select()
+              }, 200)
+            }
           }
-        }
-      } catch (error) {
-        console.log(error);
-        $nuxt.$emit("stopLoading");
-        this.$buefy.toast.open({
-          duration: 2000,
-          message: `Error`,
-          position: "is-bottom",
-          type: "is-warning",
         });
       }
-    },
+    });
+    this.$nuxt.$on("hideJellyfin", () => {
+      this.jellyfinSearch = false;
+      // alert navbar of jellyfin state
+      $nuxt.$emit("jellyfinSearchState", this.jellyfinSearch );
+    });
+
+
+    // this.$refs.jellyfinSearchInput.$el.focus();
+    
+
+    // this.$nuxt.$on("infoModal", () => {
+    //   this.infoModal = true;
+    // });
+    // this.$root.mySocket.on("setNowPlaying", (playing) => {
+    //   this.fetchPlaying(playing);
+    // });
+    // // if client joins room late
+    // this.$nuxt.$on("setPlaying", (playing) => {
+    //   this.fetchPlaying(playing);
+    // });
+  },
+  methods: {
     async searchJellyfin() {
       try {
+        $nuxt.$emit("showLoadingBar", true);
         console.log("jellyfinQuery", this.jellyfinQuery, this.searching);
         var res = await this.$axios.get(
           `${this.$config.BASE_URL}/api/jellyfin/search?searchTerm=${this.jellyfinQuery}&IncludeItemTypes=${this.searching}`
         );
 
+        $nuxt.$emit("showLoadingBar", false);
         if (res.data.Error) {
           $nuxt.$emit("stopLoading");
           this.$buefy.toast.open({
@@ -157,9 +128,12 @@ export default {
           });
         } else {
           console.log(res.data);
-          $nuxt.$emit("jellyfinSearch", res.data);
+          // $nuxt.$emit("jellyfinSearch", res.data);
+          this.jellyfinMedia = res.data;
+          this.jellyfinExpansionVisible = true;
         }
       } catch (error) {
+        $nuxt.$emit("showLoadingBar", false);
         console.log(error);
         $nuxt.$emit("stopLoading");
         this.$buefy.toast.open({
@@ -182,7 +156,7 @@ export default {
   z-index: 1;
 }
 .movie {
-  display: flex;
+  /* display: flex; */
   background-color: #18212e;
   padding: 12px 20px 12px 12px;
   font-family: "Open Sans", sans-serif;

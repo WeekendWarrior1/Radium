@@ -10,7 +10,9 @@ export const state = () => ({
     admin: null
   },
   emotes: null,
-  emoteList: null
+  emoteList: null,
+  title: null,
+  titleUUID: null,
 });
 
 export const mutations = {
@@ -37,5 +39,12 @@ export const mutations = {
   },
   setRoomUUID(state, roomUUID) {
     state.roomUUID = roomUUID;
+  },
+  // setRoomPlayingTitle(state, title, roomUUID) {
+  setRoomPlayingTitle(state, titleData) {
+    let { title, roomUUID } = titleData
+    state.title = title;
+    // make sure that the roomUUID title matches the roomUUID before showing it (doing this to keep track of nowPlaying)
+    state.titleUUID = roomUUID;
   }
 };

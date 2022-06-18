@@ -19,18 +19,21 @@
           <Player v-if="!$config.PROTECT" />
         </div>
       </div>
-      <div
+      <!-- <div
         v-if="this.$store.state.chat"
         class="
           column
           is-12-mobile is-12-tablet is-2-desktop is-2-widescreen is-2-fullhd
         "
+      > -->
+      <!-- <div
+        v-if="this.$store.state.chat"
       >
         <Chat v-if="$config.PROTECT && $store.state.authorized" />
         <Chat v-if="!$config.PROTECT" />
-      </div>
+      </div> -->
     </div>
-    <div class="under-panel">
+    <!-- <div class="under-panel">
       <div class="columns is-desktop is-gapless">
         <div class="column is-6-desktop is-6-widescreen is-6-fullhd">
           <div class="under container is-fluid">
@@ -43,15 +46,15 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
 <script>
 import Player from "../../components/Player";
-import Chat from "../../components/Chat";
-import AdvancedControls from "../../components/AdvancedControls";
-import Users from "../../components/Users";
+// import Chat from "../../components/Chat";
+// import AdvancedControls from "../../components/AdvancedControls";
+// import Users from "../../components/Users";
 import Login from "../../components/Login";
 const colors = [
   "#FF6633",
@@ -122,53 +125,40 @@ export default {
       },
     };
   },
-  // async fetch() {
-  //   this.roomInfo = await this.getRoomInfo(this.$route.params.uuid);
-  // },
-  // async created() {
-  //    // catch if roomUUID no longer exists, and redirect to landing page
-  //    // TODO would be nice to do this on created or fetch but mounted starts before these finish?
-  //    // TODO LOOK INTO middleware
-  // },
-  // beforeMount() {
-
-  // },
-  async mounted() {
+  async middleware({ $axios, $config, params, redirect }) {
     // catch if roomUUID no longer exists, and redirect to landing page
-    this.roomInfo = await this.getRoomInfo(this.$route.params.uuid);
-    if (this.roomInfo === false) {
-      // room no longer exists
-      this.$router.push(`/`);
-      // return;
-    } else {
-      // set up room
-      this.roomUUID = this.$route.params.uuid;
-      this.$store.commit("setRoomUUID", this.$route.params.uuid);
-
-      if (!this.$store.state.connected) {
-        // if protected mode running
-          if (this.$config.PROTECT) {
-            this.protectedModal();
-          } else {
-            if (this.$store.state.user.username === null) {
-              this.prompt();
-            } else {
-              this.user = this.$store.state.user;
-              this.$root.mySocket.emit("userEntersRoom", this.roomUUID, this.user);
-            }
-          }
-        // }
-
-      }
-      const emotes = await this.$axios.get(
-        `${this.$config.BASE_URL}/api/emotes/list`
-      );
-      this.$store.commit("setEmotes", emotes.data);
-      const emoteList = await this.$axios.get(
-        `${this.$config.BASE_URL}/api/emotes/emoteList`
-      );
-      this.$store.commit("setEmoteList", emoteList.data);
+    try {
+      await $axios.$get(`${$config.BASE_URL}/api/rooms/${params.uuid}`);
+    } catch (error) {
+      return redirect("/");
     }
+  },
+  async mounted() {
+    this.roomUUID = this.$route.params.uuid;
+    this.$store.commit("setRoomUUID", this.$route.params.uuid);
+
+    if (!this.$store.state.connected) {
+      // if protected mode running
+      if (this.$config.PROTECT) {
+        this.protectedModal();
+      } else {
+        if (this.$store.state.user.username === null) {
+          this.prompt();
+        } else {
+          this.user = this.$store.state.user;
+          this.$root.mySocket.emit("userEntersRoom", this.roomUUID, this.user);
+        }
+      }
+      // }
+    }
+    const emotes = await this.$axios.get(
+      `${this.$config.BASE_URL}/api/emotes/list`
+    );
+    this.$store.commit("setEmotes", emotes.data);
+    const emoteList = await this.$axios.get(
+      `${this.$config.BASE_URL}/api/emotes/emoteList`
+    );
+    this.$store.commit("setEmoteList", emoteList.data);
   },
   methods: {
     prompt() {
@@ -203,15 +193,6 @@ export default {
       // this.$root.mySocket.emit("newUser", this.user);
       this.$root.mySocket.emit("userEntersRoom", this.roomUUID, this.user);
     },
-    async getRoomInfo(roomUUID) {
-      try {
-        return await this.$axios.$get(
-          `${this.$config.BASE_URL}/api/rooms/${roomUUID}`
-        );
-      } catch (error) {
-        return false;
-      }
-    },
   },
 };
 </script>
@@ -219,7 +200,8 @@ export default {
 <style>
 .player-panel {
   background-color: #252525;
-  height: calc(100vh - 3.25rem);
+  height: calc(100vh - 64px);
+  /* height: calc(100vh - 3.25rem); */
 }
 .under-panel {
   height: 50vh;

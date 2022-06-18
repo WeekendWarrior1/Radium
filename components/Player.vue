@@ -1,22 +1,34 @@
 <template>
   <div class="player">
     <Playing />
+    <UserList
+      v-if="userListOpen"
+      :userList="users"
+    />
+    <RadiumInfo
+      v-if="radiumInfoOpen"
+      :segmentsReceivedCount="segmentsReceivedCount"
+    />
     <Jellyfin />
     <video
       id="video"
       ref="videoPlayer"
       class="video-js vjs-radium-theme"
-      poster="/radium_poster.png"
       preload="auto"
       crossorigin="anonymous"
     >
+          <!-- poster="/radium_poster.png" -->
+
       <!-- <track kind="captions" :src="subtitleUrl" srclang="en" label="default" /> -->
     </video>
   </div>
 </template>
 
 <script>
-// import Playing from "../components/Playing";
+import Playing from "../components/Playing";
+import UserList from "../components/UserList.vue";
+import RadiumInfo from "../components/RadiumInfo.vue";
+import Jellyfin from "../components/Jellyfin.vue";
 
 export default {
   // head() {
@@ -53,6 +65,19 @@ export default {
       // subtitleUrl: `${this.$config.BASE_URL}/subs.vtt`,
       engine: null,
       syncTimer: null,
+
+      userListOpen: false,
+      users: [],
+
+      radiumInfoOpen: false,
+      jellyfinVisible: false,
+
+      // keep track of how many segments were served from server vs p2p for debug purposes
+      segmentsReceivedCount: {
+        'server': 0,
+        'peers': 0,
+        'served': 0,
+      },
     };
   },
   mounted() {
@@ -151,13 +176,20 @@ export default {
 
     // this.engine.on("peer_connect", (peer) => console.log("peer_connect", peer));
     // this.engine.on("peer_close", (peerId) => console.log("peer_close", peerId));
-    // this.engine.on("segment_loaded", (segment, peerId) =>
-    //   console.log(
-    //     "segment_loaded from",
-    //     peerId ? `peer ${peerId}` : "HTTP",
-    //     segment.url
-    //   )
-    // );
+    this.engine.on("segment_loaded", (segment, peerId) => {
+      // console.log(
+      //   "segment_loaded from",
+      //   peerId ? `peer ${peerId}` : "HTTP",
+      //   segment.url
+      // )
+      this.segmentsReceivedCount[peerId ? 'peers' : 'server'] += 1;
+      // console.log(`${peerId ? 'peers' : 'server'}: `,this.segmentsReceivedCount[peerId ? 'peers' : 'server']);
+    });
+
+    this.engine.on("piece_bytes_uploaded", (segment, peerId) => {
+      this.segmentsReceivedCount.served += 1;
+    });
+
 
     // If Radium is running in protected mode, add a token to headers for authentication
     if (this.$config.PROTECT) {
@@ -229,7 +261,9 @@ export default {
         this.player.play();
       }
       // Set Now Playing
+      if (state.roomPlaying) {
       $nuxt.$emit("setPlaying", state.roomPlaying);
+      }
     });
 
     // Change HLS Stream
@@ -369,6 +403,27 @@ export default {
     this.$root.mySocket.on("setPoster", (url) => {
       this.player.poster(url);
     });
+
+    // user list component
+    this.$nuxt.$on("showUserList", (listVisible) => {
+      this.userListOpen = listVisible;
+    });
+    this.$root.mySocket.on("userList", (roomUUID, users) => {
+        this.users = users;
+    });
+
+    // radium info component
+    this.$nuxt.$on("showRadiumInfo", () => {
+      if (this.jellyfinVisible && !this.radiumInfoOpen) {
+        $nuxt.$emit("hideJellyfin");
+      }
+      this.radiumInfoOpen = !this.radiumInfoOpen;
+    });
+
+    this.$nuxt.$on("jellyfinSearchState", (jellyfinVisible) => {
+      this.jellyfinVisible = jellyfinVisible;
+    });
+
   },
   async beforeDestroy() {
     if (this.player) {

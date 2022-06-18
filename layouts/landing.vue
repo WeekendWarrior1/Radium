@@ -1,5 +1,12 @@
 <template>
-  <nuxt />
+  <!-- <v-sheet> -->
+    <!-- <Navbar /> -->
+    <v-app app>
+      <v-main fill-height>
+        <nuxt />
+      </v-main>
+    </v-app>
+  <!-- </v-sheet> -->
 </template>
 
 <script>

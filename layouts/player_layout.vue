@@ -1,17 +1,46 @@
 <template>
-  <div>
+  <v-app app>
+    <Navbar />
+    <Chat v-if="$nuxt.$route.name != 'index' && this.$store.state.chat && $config.PROTECT && $store.state.authorized" />
+    <Chat v-if="$nuxt.$route.name != 'index' && this.$store.state.chat && !$config.PROTECT" />
+    <v-main>
+      <nuxt />
+    </v-main>
+
+
+    <!-- <v-footer
+      app
+      v-if="$nuxt.$route.name === 'index'"
+      color="transparent"
+      height="72"
+      inset
+    >
+      <v-text-field
+        background-color="grey lighten-1"
+        dense
+        flat
+        hide-details
+        rounded
+        solo
+      ></v-text-field>
+    </v-footer> -->
+
+  </v-app>
+
+  <!-- <v-sheet dark>
     <Navbar />
     <nuxt />
-  </div>
+  </v-sheet> -->
 </template>
 
 <script>
 import Navbar from "../components/Navbar";
+import Chat from "../components/Chat";
 export default {};
 </script>
 
 <style>
-@import url("https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css");
+/* @import url("https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css");
 
 html {
   background-color: #252525;
@@ -30,5 +59,5 @@ body::-webkit-scrollbar-thumb {
 }
 * {
   scrollbar-color: #000000 #555555;
-}
+} */
 </style>

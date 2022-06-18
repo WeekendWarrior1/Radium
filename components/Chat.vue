@@ -1,5 +1,5 @@
 <template>
-  <div class="chat-panel">
+  <!-- <div class="chat-panel">
     <div class="message-panel" id="message-panel">
       <div class="messages" v-for="item in chat" :key="item.id">
         <b-icon
@@ -30,7 +30,83 @@
     <b-modal :active.sync="emoteModal" :destroy-on-hide="true" scroll="keep">
       <Emotes />
     </b-modal>
-  </div>
+  </div> -->
+
+  <v-navigation-drawer app
+    clipped
+    right
+  >
+  <!-- <v-navigation-drawer app
+    clipped
+    right
+    width="17.2%"
+  > -->
+    <div class="message-panel" id="message-panel">
+      <div class="messages" v-for="item in chat" :key="item.id">
+        <b-icon
+          v-if="item.user.admin"
+          icon="cog"
+          size="is-small"
+          class="admin-icon"
+          type="is-light"
+        >
+        </b-icon
+        ><span :style="{ color: item.user.color }" class="has-text-weight-bold"
+          >{{ item.user.username }} </span
+        ><span>:&nbsp;</span>
+        <div class="html-message" v-html="item.message" />
+      </div>
+      <v-footer
+        absolute
+        class="pa-0"
+      >
+        <!-- <v-form> -->
+          <!-- <v-text-field
+            class="pa-1"
+            v-model="message"
+            append-outer-icon="mdi-send"
+            solo
+            single-line
+            hide-details
+            type="text"
+            v-on:keyup.enter="sendMessage"
+            @click:append-outer="sendMessage"
+          ></v-text-field> -->
+          <!-- TODO shift enter should newline, enter should submit -->
+          <v-textarea
+            class="pa-2"
+            solo
+            type="text"
+            auto-grow
+            hide-details
+            rows="1"
+
+            v-model="message"
+            append-outer-icon="mdi-send"
+            v-on:keyup.enter="sendMessage"
+            @click:append-outer="sendMessage"
+          >
+          </v-textarea>
+        <!-- </v-form> -->
+      </v-footer>
+
+    </div>
+    <!-- <div class="input-panel">
+      <form class="input-form">
+        <input class="input is-dark" v-model="message" type="text" />
+        <button class="button is-dark" @click.prevent="sendMessage">
+          Chat
+        </button>
+      </form>
+    </div> -->
+
+    <b-modal :active.sync="helpModal" :destroy-on-hide="true" scroll="keep">
+      <Help />
+    </b-modal>
+    <b-modal :active.sync="emoteModal" :destroy-on-hide="true" scroll="keep">
+      <Emotes />
+    </b-modal>
+  </v-navigation-drawer>
 </template>
 
 <script>
@@ -59,6 +135,7 @@ export default {
       element.scrollTop = element.offsetHeight + element.scrollHeight;
     },
     async sendMessage() {
+      console.log(this.message, this.message == "/emotes")
       // parse message for commands and emotes
       switch (this.message) {
         case "":
@@ -69,6 +146,7 @@ export default {
           this.message = "";
           break;
         case "/emotes":
+        console.log('case "/emotes":',)
           this.emoteModal = true;
           this.message = "";
           break;
@@ -131,7 +209,8 @@ export default {
 
 <style>
 .chat-panel {
-  height: calc(100vh - 3.25rem);
+  /* height: calc(100vh - 4rem); */
+  height: calc(100vh);
 }
 .message-panel {
   height: 95%;
