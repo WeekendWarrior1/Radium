@@ -4,6 +4,10 @@ const torrentTrackerServer = require('bittorrent-tracker').Server;
 
 const config = require("../nuxt.config.js");
 const { ffmpegJobQueue, cleanUpffmpegDir } = require("../util/ffmpeg.js");
+const { roomsCache } = require('../util/roomsCache');
+
+import { validate as uuidValidate } from 'uuid';
+
 
 
 export default function() {
@@ -31,8 +35,8 @@ export default function() {
     // let roomSubtitleUrl = null;
     // let roomPlaying = null;
 
-    const roomsCache = {};
-    exports.roomsCache = roomsCache;
+    // const roomsCache = {};
+    // exports.roomsCache = roomsCache;
 
     // Add socket.io events
     const messages = [];
@@ -106,6 +110,9 @@ export default function() {
           }
           io.to(socket.id).emit("setState", state);
         }
+        if (roomsCache[roomUUID].posterUrl) {
+          io.to(socket.id).emit("setPoster", roomsCache[roomUUID].posterUrl);
+        }
         io.emit("roomsUpdated", roomsCache);
       });
 
@@ -173,6 +180,7 @@ export default function() {
         }
         roomsCache[roomUUID].roomHlsUrl = url;
         if (posterUrl) {
+          roomsCache[roomUUID].posterUrl = posterUrl;
           io.to(roomUUID).emit("setPoster", posterUrl);
         }
         io.to(roomUUID).emit("setStream", url);
@@ -188,18 +196,32 @@ export default function() {
         io.emit("setSubtitles", url);
       });
 
-      socket.on("nowPlaying", playing => {
-        roomPlaying = playing;
-        io.emit("setNowPlaying", playing);
+      socket.on("nowPlaying", (roomUUID, mediaInfo) => {
+        roomsCache[roomUUID].roomPlaying = mediaInfo;
+        io.to(roomUUID).emit("setNowPlaying", mediaInfo);
+        io.emit("roomsUpdated", roomsCache);
       });
 
-      // socket.on("searchJellyfin", searchTerm => {
-      //   roomPlaying = playing;
-      //   io.emit("setNowPlaying", playing);
+      // using post API instead
+      // socket.on("createRoom", (UUID) => {
+      //   console.log("createRoom",UUID, roomsCache);
+      //   if (uuidValidate(UUID)) {
+      //     roomsCache[UUID] = {
+      //       users: [],
+      //       roomHlsUrl: null,
+      //       roomPlaying: null,
+      //     }
+      //     io.emit("roomsUpdated", roomsCache);
+      //   }
       // });
 
       // relay room creation to all active clients
       socket.on("newRoomCreated", () => {
+        io.emit("roomsUpdated", roomsCache);
+      });
+
+      // relay room deletion to all active clients
+      socket.on("roomDeleted", () => {
         io.emit("roomsUpdated", roomsCache);
       });
 

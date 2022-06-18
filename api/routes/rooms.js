@@ -3,7 +3,7 @@ const router = Router();
 
 import { v4 as uuidv4, validate as uuidValidate } from 'uuid';
 
-const { roomsCache } = require('../../io/index');
+const { roomsCache } = require('../../util/roomsCache');
 const config = require("../../nuxt.config.js");
 
 // create room
@@ -97,6 +97,9 @@ router.delete("/rooms/:UUID", async function (req, res, next) {
 
 function deleteRoom(UUID) {
     console.log(`deleting room, UUID: ${UUID}`);
+    // TODO what happens when someone deletes a room that is not empty??
+    // should kick users back to landing page
+    // could use websockets to throw up a toast/notification
     delete roomsCache[UUID];
 }
 
