@@ -18,6 +18,14 @@
 Advanced Controls found below the player
 ![screenshot_ac](https://i.imgur.com/vHE50aH.png)
 
+## New Features
+- p2p media distribution!!! - multiple users in the same room will share video segments to each other, dramatically reducing required bandwidth (and in theory, a server with only 10Mbit upload should be able to let 100s of users watch the same media synced)
+- Player should sync automatically when any user plays, pauses or joins (note: currently doesn't sync if a user plays/pauses using PIP floating player controls)
+- (basic) Multiroom support - doesn't currently support passworded rooms or 'room admins'
+- Integrated 'on-the-fly' http video stream to HLS transcoding (requires ffmpeg installed on machine)
+- Integrated jellyfin data source
+- New UI
+
 ## Features
 
 - HLS
