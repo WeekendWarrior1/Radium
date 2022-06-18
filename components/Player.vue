@@ -78,6 +78,16 @@ export default {
         'peers': 0,
         'served': 0,
       },
+      
+      dvdBounceActive: true,
+      dvdBouncerInterval: null,
+      playerResizeObserver: null,
+      dvdSVGLogo: null,
+      dvdXpos: 10,
+      dvdYpos: 10,
+      dvdXSpeed: 4,
+      dvdYSpeed: 4,
+      dvdFPS: 60,
     };
   },
   mounted() {
@@ -262,7 +272,7 @@ export default {
       }
       // Set Now Playing
       if (state.roomPlaying) {
-      $nuxt.$emit("setPlaying", state.roomPlaying);
+        $nuxt.$emit("setPlaying", state.roomPlaying);
       }
     });
 
@@ -401,6 +411,7 @@ export default {
 
     // on setPoster from stream
     this.$root.mySocket.on("setPoster", (url) => {
+      this.destroyDVDBouncer();
       this.player.poster(url);
     });
 
@@ -424,8 +435,38 @@ export default {
       this.jellyfinVisible = jellyfinVisible;
     });
 
+    // default poster of bouncing dvd logo lol
+    // https://codepen.io/Web_Cifar/pen/JjXrLRJ
+    this.buildDvdSVGLogo();
+    let vjsPoster = document.getElementsByClassName('vjs-poster vjs-hidden')[0];
+    vjsPoster.appendChild(this.dvdSVGLogo);
+    vjsPoster.classList.remove("vjs-hidden");
+
+    this.dvdBouncerInterval = setInterval(this.checkForDvdBounce, 1000 / this.dvdFPS );
+
+    this.playerResizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        const cr = entry.contentRect;
+        let logo = document.querySelector(".logo");
+        if (this.dvdXpos + logo.clientWidth > cr.width) {
+          this.dvdXpos = cr.width - logo.clientWidth;
+        }
+        if (this.dvdYpos + logo.clientHeight > cr.height) {
+          this.dvdYpos = cr.height - logo.clientHeight;
+        }
+        if (this.dvdXpos < 0) {
+          this.dvdXpos = 0;
+        }
+        if (this.dvdYpos < 0) {
+          this.dvdYpos = 0;
+        }
+      }
+    });
+    this.playerResizeObserver.observe(this.$refs.videoPlayer);
   },
   async beforeDestroy() {
+    this.destroyDVDBouncerListeners();
+
     if (this.player) {
       await this.player.dispose();
     }
@@ -442,11 +483,82 @@ export default {
     this.$root.mySocket.off("serverPause");
     this.$root.mySocket.off("serverSync");
     this.$root.mySocket.off("setPoster");
+    this.$root.mySocket.off("userList");
+    this.$root.mySocket.off("showRadiumInfo");
   },
+  methods: {
+    checkForDvdBounce() {
+      let logo = document.querySelector(".logo");
+      if (this.dvdXpos + logo.clientWidth >= this.$refs.videoPlayer.clientWidth || this.dvdXpos <= 0) {
+        this.dvdXSpeed = -this.dvdXSpeed;
+        logo.style.fill = this.randomColour();
+      }
+      if (this.dvdYpos + logo.clientHeight >= this.$refs.videoPlayer.clientHeight || this.dvdYpos <= 0) {
+        this.dvdYSpeed = -this.dvdYSpeed;
+        logo.style.fill = this.randomColour();
+      }
+
+      this.dvdXpos += this.dvdXSpeed;
+      this.dvdYpos += this.dvdYSpeed;
+      this.updateDvdPosition(logo);
+    },
+    buildDvdSVGLogo() {
+      this.dvdSVGLogo = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      this.dvdSVGLogo.classList.add('logo');
+      // this.dvdSVGLogo.setAttribute('id', 'logo');
+      this.dvdSVGLogo.setAttribute('viewbox', '0 0 16 8');
+      this.dvdSVGLogo.setAttribute('fill', 'none');
+      this.dvdSVGLogo.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xlink", "http://www.w3.org/1999/xlink");
+
+      let path = document.createElementNS("http://www.w3.org/2000/svg", 'path');
+      path.setAttribute('d', 'M7.4 4.959C3.268 4.959 0 5.509 0 6.186C0 6.864 3.268 7.413 7.4 7.413C11.532 7.413 14.943 6.864 14.943 6.186C14.944 5.508 11.533 4.959 7.4 4.959ZM7.263 6.51C6.306 6.51 5.53 6.273 5.53 5.98C5.53 5.687 6.306 5.45 7.263 5.45C8.22 5.45 8.995 5.687 8.995 5.98C8.995 6.273 8.219 6.51 7.263 6.51ZM13.319 0.052002H9.701L7.769 2.291L6.849 0.0830021H1.145L0.933 1.045H3.202C3.202 1.045 4.239 0.909002 4.273 1.739C4.273 3.177 1.897 3.055 1.897 3.055L2.341 1.555H0.869L0.194 3.988H2.862C2.862 3.988 5.683 3.738 5.683 1.77C5.683 1.77 5.797 1.196 5.749 0.943002L7.124 4.62L10.559 1.055H13.165C13.165 1.055 13.963 1.123 13.963 1.74C13.963 3.178 11.604 3.028 11.604 3.028L11.969 1.556H10.682L9.946 3.989H12.399C12.399 3.989 15.465 3.799 15.465 1.71C15.465 1.709 15.404 0.052002 13.319 0.052002Z');
+      // scale is workaround of svg not filling viewbox, regardless (because of parent viewbox attr?)
+      path.setAttribute('transform', "scale(13)");
+      this.dvdSVGLogo.appendChild(path);
+    },
+    updateDvdPosition(logo) {
+      logo.style.left = this.dvdXpos + "px";
+      logo.style.top = this.dvdYpos + "px";
+    },
+    randomColour() {
+      return `#${Math.random().toString(16).slice(2, 8).toUpperCase()}`;
+    },
+    destroyDVDBouncer() {
+      this.destroyDVDBouncerListeners();
+      // remove elements
+      let vjsPoster = document.getElementsByClassName('vjs-poster');
+      if (vjsPoster.length && vjsPoster[0].querySelector('.logo')) {
+        vjsPoster = vjsPoster[0];
+        vjsPoster.removeChild(this.dvdSVGLogo);
+        vjsPoster.classList.add("vjs-hidden");
+      }    
+    },
+    destroyDVDBouncerListeners() {
+      if (this.dvdBouncerInterval) {
+        clearInterval(this.dvdBouncerInterval);
+      }
+      if (this.playerResizeObserver) {
+        this.playerResizeObserver.disconnect();
+      }
+    }
+  }
 };
 </script>
 
 <style>
+/* dvd bounce */
+svg {
+  position: absolute;
+  width: 201px;
+  height: 100px;
+  fill: rgb(0, 81, 255);
+}
+/* @media (max-width: 768px) {
+  svg {
+    width: 150px;
+  }
+} */
+
 .player {
   width: 100%;
   height: 100%;
