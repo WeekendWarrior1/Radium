@@ -35,6 +35,7 @@
   <v-navigation-drawer app
     clipped
     right
+    v-if="this.$store.state.chat"
   >
   <!-- <v-navigation-drawer app
     clipped
@@ -83,7 +84,7 @@
 
             v-model="message"
             append-outer-icon="mdi-send"
-            v-on:keyup.enter="sendMessage"
+            v-on:keyup.enter.exact="sendMessage"
             @click:append-outer="sendMessage"
           >
           </v-textarea>
@@ -122,12 +123,30 @@ export default {
     };
   },
   mounted() {
+    this.$root.mySocket.on("setRoomMessages", (messages) => {
+      console.log(`this.$nuxt.$on("setRoomMessages", (messages) => {`, messages);
+      this.chat = messages;
+      this.$nextTick(() => {
+        this.setScrollToEnd();
+      });
+    });
+    // this.$nuxt.$on("setRoomMessages", (messages) => {
+    //   console.log(`this.$nuxt.$on("setRoomMessages", (messages) => {`, messages);
+    //   this.chat = messages;
+    //   this.$nextTick(() => {
+    //     this.setScrollToEnd();
+    //   });
+    // });
     this.$root.mySocket.on("sendMessage", message => {
       this.chat.push(message);
       this.$nextTick(() => {
         this.setScrollToEnd();
       });
     });
+  },
+  beforeDestroy() {
+    this.$root.mySocket.off("sendMessage");
+    this.$root.mySocket.off("setRoomMessages");
   },
   methods: {
     setScrollToEnd() {

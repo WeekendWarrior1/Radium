@@ -1,10 +1,10 @@
 <h1 align="center">
   <br>
-  <a href="https://github.com/Zibbp/Radium"><img src="https://i.imgur.com/gylnyVs.png" alt="Radium" width="500"></a>
+  <a href="https://github.com/WeekendWarrior1/Radium"><img src="https://i.imgur.com/gylnyVs.png" alt="Radium" width="500"></a>
   <br>
 </h1>
 
-<h4 align="center">🖥️<a href="https://radium-demo.herokuapp.com" target="_blank">Demo</a><i> may take a minute to wake app</i></h4>
+<!--<h4 align="center">🖥️<a href="https://radium-demo.herokuapp.com" target="_blank">Demo</a><i> may take a minute to wake app</i></h4>
 
 <p align="center">
   Radium<a href="https://github.com/Zibbp/Radium">
@@ -12,11 +12,11 @@
          alt="Docker Image">
   </a>
   Nginx-RTMP-HLS <a href="https://github.com/Zibbp/Nginx-RTMP-HLS"><img src="https://github.com/Zibbp/Nginx-RTMP-HLS/workflows/Build/badge.svg"></a>
-</p>
+</p>-->
 
-![screenshot](https://i.imgur.com/lHmxc6m.png)
-Advanced Controls found below the player
-![screenshot_ac](https://i.imgur.com/vHE50aH.png)
+![screenshot](documentation/landing_page.png)
+
+![screenshot_ac](documentation/jellyfin_search.png)
 
 ## New Features
 - p2p media distribution!!! - multiple users in the same room will share video segments to each other, dramatically reducing required bandwidth (and in theory, a server with only 10Mbit upload should be able to let 100s of users watch the same media synced)

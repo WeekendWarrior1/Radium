@@ -4,10 +4,9 @@ const torrentTrackerServer = require('bittorrent-tracker').Server;
 
 const config = require("../nuxt.config.js");
 const { ffmpegJobQueue, cleanUpffmpegDir } = require("../util/ffmpeg.js");
-const { roomsCache } = require('../util/roomsCache');
+const { roomsCache } = require('../util/roomsCache.js');
 
 import { validate as uuidValidate } from 'uuid';
-
 
 
 export default function() {
@@ -113,6 +112,9 @@ export default function() {
         if (roomsCache[roomUUID].posterUrl) {
           io.to(socket.id).emit("setPoster", roomsCache[roomUUID].posterUrl);
         }
+        if (roomsCache[roomUUID].messages.length) {
+          io.to(socket.id).emit("setRoomMessages", roomsCache[roomUUID].messages);
+        }
         io.emit("roomsUpdated", roomsCache);
       });
 
@@ -188,6 +190,7 @@ export default function() {
       });
 
       socket.on("message", (roomUUID, message) => {
+        roomsCache[roomUUID].addMessageToChat(message);
         io.to(roomUUID).emit("sendMessage", message);
       });
 

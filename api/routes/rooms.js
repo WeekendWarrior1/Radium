@@ -14,8 +14,17 @@ router.post("/rooms", async function (req, res, next) {
 
         roomsCache[generatedUUID] = {
             users: [],
+            messages: [], // TODO messages aren't really secret as any that queries room api will see all messages within all rooms
+            addMessageToChat: function(message) {
+                this.messages.push(message);
+                if (config.default.publicRuntimeConfig.ROOM_CHAT_MESSAGES_PERSISTENCE) {
+                    while (this.messages.length > config.default.publicRuntimeConfig.ROOM_CHAT_MESSAGES_PERSISTENCE) {
+                        this.messages.shift();
+                    }
+                }
+            },
             roomHlsUrl: null,
-            // TODO roomPLaying should contain lots of metadata, including roomPoster
+            // TODO roomPlaying should contain lots of metadata, including roomPoster
             roomPlaying: null,
         }
 

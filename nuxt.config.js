@@ -11,6 +11,7 @@ export default {
     // ADMIN_TOKEN: process.env.ADMIN_TOKEN,
     API_URL: process.env.API_URL || `http://localhost:5555/api`,
     OMDB_API_KEY: process.env.OMDB_API_KEY || "7c3178bf",
+    ROOM_CHAT_MESSAGES_PERSISTENCE: process.env.ROOM_CHAT_MESSAGES_PERSISTENCE || 100, // set 0 to disable
     VERSION: process.env.npm_package_version,
     PROTECT: process.env.PROTECTED,
     PUBLIC: process.env.PUBLIC || `/home/weekendwarrior1/git/weekendwarrior1/Radium/public`,

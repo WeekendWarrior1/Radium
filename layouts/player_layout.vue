@@ -1,8 +1,9 @@
 <template>
   <v-app app>
     <Navbar />
-    <Chat v-if="$nuxt.$route.name != 'index' && this.$store.state.chat && $config.PROTECT && $store.state.authorized" />
-    <Chat v-if="$nuxt.$route.name != 'index' && this.$store.state.chat && !$config.PROTECT" />
+    <!-- <Chat v-if="$nuxt.$route.name != 'index' && this.$store.state.chat && $config.PROTECT && $store.state.authorized" /> -->
+    <!-- <Chat v-if="$nuxt.$route.name != 'index' && this.$store.state.chat && !$config.PROTECT" /> -->
+    <Chat v-if="$nuxt.$route.name != 'index' && !$config.PROTECT" />
     <v-main>
       <nuxt />
     </v-main>
