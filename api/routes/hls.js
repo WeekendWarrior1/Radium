@@ -2,7 +2,43 @@ const express = require("express");
 const config = require("../../nuxt.config.js");
 const fs = require('fs');
 
+const { generateThumb } = require('../../util/ffmpeg');
+
+
+exports.makeSureThumbExists = async function makeSureThumbExists(req, res, next) {
+    if (!req.path.startsWith('/thumbs/')) {
+        next();
+        return;
+    }
+
+    let thumbToServe = req.path.split('/')[2];
+    try {
+        await fs.promises.access(config.default.publicRuntimeConfig.PUBLIC + req.path);
+        // if got to here, send the file
+        next();
+        return;
+    } catch {
+        const thumbTimer = setTimeout(function () {
+            console.log(`${thumbToServe} didn't appear after 30 seconds, aborting (408 - timeout)`);
+            res.sendStatus(408);
+            return;
+        }, 30000);
+
+        let filename = thumbToServe.slice(0, thumbToServe.length - 4);
+        let mediaLocation = `${config.default.publicRuntimeConfig.LOCAL_MEDIA_DIRECTORY}${(req.query.directory || '')}${filename}`;
+        await generateThumb(filename, mediaLocation);
+        clearTimeout(thumbTimer);
+        next();
+        return;
+    }
+}
+
 exports.makeSureSegmentIsFinished = async function makeSureSegmentIsFinished(req, res, next) {
+    if (!req.path.startsWith('/hls/')) {
+        next();
+        return;
+    }
+
     let itemId = req.path.split('/')[2];
     let fileToServe = req.path.split('/')[3];
     let itemDirectory = config.default.publicRuntimeConfig.HLS_SERVE_DIR + itemId;
@@ -62,5 +98,3 @@ exports.makeSureSegmentIsFinished = async function makeSureSegmentIsFinished(req
         }
     }
 }
-
-exports.staticFileServe = express.static(config.default.publicRuntimeConfig.PUBLIC, { fallthrough: false });

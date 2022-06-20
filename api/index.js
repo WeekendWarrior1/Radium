@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const socket = require("socket.io");
 
+const config = require("../nuxt.config.js");
+
 // Create express instance
 const app = express();
 
@@ -10,7 +12,8 @@ const auth = require("./routes/auth");
 const emotes = require("./routes/emotes");
 const jellyfin = require("./routes/jellyfin");
 const rooms = require("./routes/rooms");
-const { makeSureSegmentIsFinished, staticFileServe } = require("./routes/hls");
+const localfs = require("./routes/localfs");
+const { makeSureThumbExists, makeSureSegmentIsFinished } = require("./routes/hls");
 
 app.use(cors({
 	origin: '*',
@@ -24,9 +27,13 @@ app.use(auth);
 app.use(emotes);
 app.use(jellyfin);
 app.use(rooms);
+app.use(localfs);
 
+app.use(makeSureThumbExists);
 app.use(makeSureSegmentIsFinished);
-app.use(staticFileServe);
+
+// staticFileServe
+app.use(express.static(config.default.publicRuntimeConfig.PUBLIC, { fallthrough: false }));
 
 // Export express app
 module.exports = app;

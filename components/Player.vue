@@ -10,6 +10,7 @@
       :segmentsReceivedCount="segmentsReceivedCount"
     />
     <Jellyfin />
+    <LocalMedia />
     <video
       id="video"
       ref="videoPlayer"
@@ -29,6 +30,7 @@ import Playing from "../components/Playing";
 import UserList from "../components/UserList.vue";
 import RadiumInfo from "../components/RadiumInfo.vue";
 import Jellyfin from "../components/Jellyfin.vue";
+import LocalMedia from "../components/LocalMedia.vue";
 
 export default {
   // head() {

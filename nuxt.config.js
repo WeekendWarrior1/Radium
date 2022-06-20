@@ -33,6 +33,8 @@ export default {
     JACKETT_BASE_URI: process.env.JACKETT_BASE_URI || "http://192.168.1.2:9117",
     JACKETT_API_KEY: process.env.JACKETT_API_KEY || "placeholder",
     DELUGE_BASE_URI: process.env.DELUGE_BASE_URI || "http://192.168.1.2:8112",
+    LOCAL_MEDIA_DIRECTORY: process.env.LOCAL_MEDIA_DIRECTORY || false,
+    THUMBS_SERVE_DIR: process.env.THUMBS_SERVE_DIR || `/home/weekendwarrior1/git/weekendwarrior1/Radium/public/thumbs/`,
     io: {
       // will be available in this.$config.io
       sockets: [

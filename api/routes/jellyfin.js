@@ -4,7 +4,7 @@ const retryFetch = require('fetch-retry')(fetch);
 import { validate as uuidValidate } from 'uuid';
 
 const router = Router();
-const { ffmpegJobQueue, startHLSstream, ffmpegConvertSubtitles } = require('../../util/ffmpeg');
+const { startHLSstream, ffmpegConvertSubtitles } = require('../../util/ffmpeg');
 
 const config = require("../../nuxt.config.js");
 

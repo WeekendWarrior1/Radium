@@ -4,13 +4,13 @@
     <v-toolbar-title v-if="$nuxt.$route.name == 'index'"
       ><v-img src="/logo.png" alt="Radium" width="140" contain></v-img
     ></v-toolbar-title>
-    <v-btn v-if="$nuxt.$route.name != 'index'" @click="leaveRoom">
+    <v-btn v-if="$nuxt.$route.name !== 'index'" @click="leaveRoom">
       <v-icon>mdi-arrow-left</v-icon>
       <!-- <v-img v-if="$nuxt.$route.name == 'index'" src="/logo.png" alt="Radium" width="160" contain></v-img> -->
     </v-btn>
     <!-- TODO if watching media -->
       <v-toolbar-title
-        v-if="$nuxt.$route.name != 'index' && this.$store.state.title && ($nuxt.$route.path === `/room/${this.$store.state.titleUUID}`)"
+        v-if="$nuxt.$route.name !== 'index' && this.$store.state.title && ($nuxt.$route.path === `/room/${this.$store.state.titleUUID}`)"
         class="pl-2"
         @mouseenter="nowplaying(true)"
         @mouseleave="nowplaying(false)"
@@ -21,8 +21,15 @@
 
     <v-spacer></v-spacer>
 
+    <!-- TODO only show if local media enabled on server config -->
+    <v-btn v-if="$nuxt.$route.name !== 'index'" @click="localMediaToggle()" class="mr-2">
+      <!-- <v-icon>mdi-folder-play</v-icon> -->
+      <v-icon class="pr-2">mdi-folder</v-icon>
+      Local Media
+    </v-btn>
+
     <!-- TODO only show if jellyfin enabled on server config -->
-    <v-btn v-if="$nuxt.$route.name != 'index'" @click="jellyfinSearch()">
+    <v-btn v-if="$nuxt.$route.name !== 'index'" @click="jellyfinSearch()">
       <v-img class="pr-2" src="/jellyfin-icon-transparent.svg" width="28" contain alt="jellyfin"></v-img>
       Search Jellyfin
     </v-btn>
@@ -36,7 +43,7 @@
     </v-btn>
 
     <v-btn
-      v-if="$nuxt.$route.name != 'index'"
+      v-if="$nuxt.$route.name !== 'index'"
       icon
       @mouseenter="userListOpen(true)"
       @mouseleave="userListOpen(false)"
@@ -46,7 +53,7 @@
     </v-btn>
 
     <v-btn
-      v-if="$nuxt.$route.name != 'index'"
+      v-if="$nuxt.$route.name !== 'index'"
       icon 
       @click="toggleChat"
     >
@@ -81,17 +88,17 @@
         >
           🔒 Protect
         </b-navbar-item>
-        <b-navbar-item v-if="$nuxt.$route.name != 'index'" @click="info">
+        <b-navbar-item v-if="$nuxt.$route.name !== 'index'" @click="info">
           <b-icon icon="information-outline"></b-icon>
         </b-navbar-item>
-        <b-navbar-item v-if="$nuxt.$route.name != 'index'" @click="nowplaying">
+        <b-navbar-item v-if="$nuxt.$route.name !== 'index'" @click="nowplaying">
           <b-icon
             icon="cursor-default-click-outline"
             class="now-playing-icon"
           ></b-icon
           >Now Playing
         </b-navbar-item>
-        <b-navbar-item v-if="$nuxt.$route.name != 'index'" @click="jellyfin">
+        <b-navbar-item v-if="$nuxt.$route.name !== 'index'" @click="jellyfin">
           <img src="/jellyfin-icon-transparent.svg" alt="jellyfin" />
           Search Jellyfin
         </b-navbar-item>
@@ -101,7 +108,7 @@
         <b-navbar-item tag="div">
           <div class="buttons">
             <b-tooltip
-              v-if="this.$store.state.chat && $nuxt.$route.name != 'index'"
+              v-if="this.$store.state.chat && $nuxt.$route.name !== 'index'"
               label="Hide Chat"
               :delay="500"
               position="is-left"
@@ -112,7 +119,7 @@
               </button>
             </b-tooltip>
             <b-tooltip
-              v-if="!this.$store.state.chat && $nuxt.$route.name != 'index'"
+              v-if="!this.$store.state.chat && $nuxt.$route.name !== 'index'"
               label="Show Chat"
               :delay="500"
               position="is-left"
@@ -150,6 +157,7 @@ export default {
     return {
       infoModal: false,
       jellyfinSearchOpen: false,
+      mediaSearchOpen: false,
       showLoadingBar: false,
     };
   },
@@ -182,6 +190,9 @@ export default {
     },
     jellyfinSearch() {
       $nuxt.$emit("jellyfinSearch");
+    },
+    localMediaToggle() {
+      $nuxt.$emit("localMediaToggle");
     },
     userListOpen(listVisible) {
       if (this.jellyfinSearchOpen === false) {

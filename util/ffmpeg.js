@@ -37,9 +37,9 @@ exports.startHLSstream = async function startHLSstream(roomUUID, itemId, mediaLo
         } catch (error) {
             if (error.code === 'EEXIST') {
                 console.log(`'${roomUUID}' workdir already exists at: ${workDir}, removing all .ts and .m3u8 within...`)
-                fs.readdirSync(workDir)
+                (await fs.promises.readdir(workDir))
                     .filter(f => (f.endsWith('.ts') || f.endsWith('.m3u8') || f.endsWith('.vtt') || f == 'ffmpeg_finished'))
-                    .map(f => fs.unlinkSync(workDir + f))
+                    .map(async (f) => await fs.promises.unlink(workDir + f))
             } else {
                 console.log(error);
             }
@@ -404,3 +404,14 @@ async function ffmpegConvertSubtitles(subLocation, filename, extension) {
 }
 
 exports.ffmpegConvertSubtitles = ffmpegConvertSubtitles;
+
+exports.generateThumb = async function generateThumb(filename, mediaLocation) {
+// async function ffmpegConvertSubtitles(subLocation, filename, extension) {
+    // let ffmpegCommand = `ffmpeg -i ${subLocation} -map 0:s:0 ${filename}`;
+    // const ffmpegCommand = ['-y', '-i',subLocation, '-map', '0:s:0', filename]
+    // const ffmpegCommand = ['-ss', '00:00:30.00', '-i', mediaLocation, '-vf', 'scale=320:320:force_original_aspect_ratio=decrease', '-vframes', '1', `${config.default.publicRuntimeConfig.THUMBS_SERVE_DIR}${filename}.jpg`]
+    const ffmpegCommand = ['-ss', '00:00:30.00', '-i', mediaLocation, '-vframes', '1', `${config.default.publicRuntimeConfig.THUMBS_SERVE_DIR}${filename}.jpg`]
+    console.log('generateThumb', ffmpegCommand);
+    return await spawn(`ffmpeg`, ffmpegCommand);
+}
+// ffmpeg -ss 00:00:01.00 -i input.mp4 -vf 'scale=320:320:force_original_aspect_ratio=decrease' -vframes 1 output.jpg

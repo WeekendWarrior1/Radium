@@ -6,6 +6,8 @@ services:
     ports:
       - "5555:5555"
       - "5556:5556"
+    # volumes:
+    #   - /your/media/dir:/opt/app/mounted_media:ro
     environment:
     # TODO minmise amount of config by tacking ontop of baseurl
       - "BASE_URL=http://192.168.1.2:5555"
@@ -25,4 +27,6 @@ services:
       - "JELLYFIN_BASE_URI=http://192.168.1.2:8096"
       - "JELLYFIN_USER=f15916cec2f24ba0956e4b135ac779bb"
       - "JELLYFIN_API_KEY=f8d5769c207046a68987e7d0e80ceef3"
+      # - LOCAL_MEDIA_DIRECTORY=/opt/app/mounted_media/
+      # - THUMBS_SERVE_DIR=/opt/app/public/thumbs/
     image: "radium:latest"
