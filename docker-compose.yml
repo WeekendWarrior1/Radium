@@ -23,10 +23,11 @@ services:
       - "WEBTORRENT_BASE_URL=ws://192.168.1.2:5556"
       - "WEBTORRENT_TRACKER_ADDRESS=192.168.1.2"
       - "WEBTORRENT_TRACKER_PORT=5556"
-      # - "JELLYFIN_ENABLED="
+      - "JELLYFIN_ENABLED=true"
       - "JELLYFIN_BASE_URI=http://192.168.1.2:8096"
       - "JELLYFIN_USER=f15916cec2f24ba0956e4b135ac779bb"
       - "JELLYFIN_API_KEY=f8d5769c207046a68987e7d0e80ceef3"
       # - LOCAL_MEDIA_DIRECTORY=/opt/app/mounted_media/
       # - THUMBS_SERVE_DIR=/opt/app/public/thumbs/
+      # - "REMOTE_MEDIA_ENABLED=true"
     image: "radium:latest"

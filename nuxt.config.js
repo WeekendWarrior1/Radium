@@ -35,6 +35,7 @@ export default {
     DELUGE_BASE_URI: process.env.DELUGE_BASE_URI || "http://192.168.1.2:8112",
     LOCAL_MEDIA_DIRECTORY: process.env.LOCAL_MEDIA_DIRECTORY || false,
     THUMBS_SERVE_DIR: process.env.THUMBS_SERVE_DIR || `/home/weekendwarrior1/git/weekendwarrior1/Radium/public/thumbs/`,
+    REMOTE_MEDIA_ENABLED: process.env.REMOTE_MEDIA_ENABLED || false,
     io: {
       // will be available in this.$config.io
       sockets: [

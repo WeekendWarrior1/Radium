@@ -13,6 +13,7 @@ const emotes = require("./routes/emotes");
 const jellyfin = require("./routes/jellyfin");
 const rooms = require("./routes/rooms");
 const localfs = require("./routes/localfs");
+const remoteMedia = require("./routes/remoteMedia");
 const { makeSureThumbExists, makeSureSegmentIsFinished } = require("./routes/hls");
 
 app.use(cors({
@@ -25,9 +26,17 @@ app.use(cors({
 // Import API Routes
 app.use(auth);
 app.use(emotes);
-app.use(jellyfin);
 app.use(rooms);
-app.use(localfs);
+
+if (config.default.publicRuntimeConfig.JELLYFIN_ENABLED) {
+  app.use(jellyfin);
+}
+if (config.default.publicRuntimeConfig.LOCAL_MEDIA_DIRECTORY) {
+  app.use(localfs);
+}
+if (config.default.publicRuntimeConfig.REMOTE_MEDIA_ENABLED) {
+  app.use(remoteMedia);
+}
 
 app.use(makeSureThumbExists);
 app.use(makeSureSegmentIsFinished);

@@ -22,14 +22,21 @@
     <v-spacer></v-spacer>
 
     <!-- TODO only show if local media enabled on server config -->
-    <v-btn v-if="$nuxt.$route.name !== 'index'" @click="localMediaToggle()" class="mr-2">
+    <v-btn v-if="$nuxt.$route.name !== 'index' && this.$config.REMOTE_MEDIA_ENABLED" @click="remoteMediaToggle()" class="mr-2">
+      <!-- <v-icon>mdi-folder-play</v-icon> -->
+      <v-icon class="pr-2">mdi-cloud-download</v-icon>
+      Remote Media
+    </v-btn>
+
+    <!-- TODO only show if local media enabled on server config -->
+    <v-btn v-if="$nuxt.$route.name !== 'index' && this.$config.LOCAL_MEDIA_DIRECTORY" @click="localMediaToggle()" class="mr-2">
       <!-- <v-icon>mdi-folder-play</v-icon> -->
       <v-icon class="pr-2">mdi-folder</v-icon>
       Local Media
     </v-btn>
 
     <!-- TODO only show if jellyfin enabled on server config -->
-    <v-btn v-if="$nuxt.$route.name !== 'index'" @click="jellyfinSearch()">
+    <v-btn v-if="$nuxt.$route.name !== 'index' && this.$config.JELLYFIN_ENABLED" @click="jellyfinSearch()">
       <v-img class="pr-2" src="/jellyfin-icon-transparent.svg" width="28" contain alt="jellyfin"></v-img>
       Search Jellyfin
     </v-btn>
@@ -193,6 +200,9 @@ export default {
     },
     localMediaToggle() {
       $nuxt.$emit("localMediaToggle");
+    },
+    remoteMediaToggle() {
+      $nuxt.$emit("remoteMediaToggle");
     },
     userListOpen(listVisible) {
       if (this.jellyfinSearchOpen === false) {

@@ -100,12 +100,8 @@ export default {
       this.$root.mySocket.emit(
         "changeStream",
         this.$store.state.roomUUID,
-        // `${this.$config.BASE_URL}/api/jellyfin/stream.m3u8?item=${item.Id}`,
         `${this.$config.BASE_URL}/api/localfs/${this.$store.state.roomUUID}/${file.filename}/stream.m3u8${(this.currentDirectory !== '') ? `?directory=${this.currentDirectory}` : ''}`,
         `${this.$config.BASE_URL}/api/thumbs/${file.filename}.jpg${this.currentDirectory ? `?directory=${this.currentDirectory}` : '' }`
-        // item.ParentBackdropImageTags && item.ParentBackdropImageTags.length
-        //   ? `${this.$config.BASE_URL}/api/jellyfin/backdrop?item=${item.ParentBackdropItemId}&tag=${item.ParentBackdropImageTags[0]}`
-        //   : false
       );
       this.mediaVisible = false;
 

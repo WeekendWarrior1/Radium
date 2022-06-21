@@ -9,8 +9,9 @@
       v-if="radiumInfoOpen"
       :segmentsReceivedCount="segmentsReceivedCount"
     />
-    <Jellyfin />
-    <LocalMedia />
+    <Jellyfin v-if="this.$config.JELLYFIN_ENABLED"/>
+    <LocalMedia v-if="this.$config.LOCAL_MEDIA_DIRECTORY"/>
+    <RemoteMedia v-if="this.$config.REMOTE_MEDIA_ENABLED"/>
     <video
       id="video"
       ref="videoPlayer"
@@ -31,6 +32,7 @@ import UserList from "../components/UserList.vue";
 import RadiumInfo from "../components/RadiumInfo.vue";
 import Jellyfin from "../components/Jellyfin.vue";
 import LocalMedia from "../components/LocalMedia.vue";
+import RemoteMedia from "../components/RemoteMedia.vue";
 
 export default {
   // head() {
