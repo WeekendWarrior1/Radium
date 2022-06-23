@@ -3,6 +3,8 @@ FROM node:lts-alpine3.14
 
 # install ffmpeg and ffprobe
 RUN apk add --no-cache ffmpeg
+# have to grab yt-dlp from edge repo because not in main yet
+RUN apk add --no-cache yt-dlp --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
 # create destination directory
 WORKDIR /opt/app

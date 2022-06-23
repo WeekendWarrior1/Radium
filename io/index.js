@@ -189,6 +189,12 @@ export default function() {
         io.emit("roomsUpdated", roomsCache);
       });
 
+      socket.on("setPoster", (roomUUID, posterUrl) => {
+        roomsCache[roomUUID].posterUrl = posterUrl;
+        io.to(roomUUID).emit("setPoster", posterUrl);
+        io.emit("roomsUpdated", roomsCache);
+      });
+
       socket.on("message", (roomUUID, message) => {
         roomsCache[roomUUID].addMessageToChat(message);
         io.to(roomUUID).emit("sendMessage", message);

@@ -36,6 +36,7 @@ export default {
     LOCAL_MEDIA_DIRECTORY: process.env.LOCAL_MEDIA_DIRECTORY || false,
     THUMBS_SERVE_DIR: process.env.THUMBS_SERVE_DIR || `/home/weekendwarrior1/git/weekendwarrior1/Radium/public/thumbs/`,
     REMOTE_MEDIA_ENABLED: process.env.REMOTE_MEDIA_ENABLED || false,
+    YTDLP_ENABLED: process.env.YTDLP_ENABLED || false,
     io: {
       // will be available in this.$config.io
       sockets: [

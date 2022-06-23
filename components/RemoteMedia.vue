@@ -5,7 +5,7 @@
         <v-row>
           <v-col cols="12" sm="10" md="10" lg="10" xl="10">
             <v-text-field
-              v-on:keyup.enter="startMedia"
+              v-on:keyup.enter="directUrlOrYTDLP"
               label="Video file url"
               outlined
               dense
@@ -15,7 +15,7 @@
           </v-col>
 
           <v-col cols="12" sm="2" md="2" lg="2" xl="2">
-            <v-btn @click="startMedia" text color="primary" elevation="3"> Play Remote Media </v-btn>
+            <v-btn @click="directUrlOrYTDLP" text color="primary" elevation="3"> Play Remote Media </v-btn>
           </v-col>
         </v-row>
       </v-container>
@@ -50,8 +50,9 @@ export default {
     });
   },
   methods: {
-    async startMedia() {
+    async directUrlOrYTDLP () {
       const remoteFile = this.$refs.remoteMediaInput.$el.querySelector('input:not([type=hidden]),textarea:not([type=hidden])').value;
+      console.log('directUrlOrYTDLP', remoteFile);
       if (remoteFile === '') {
         // TODO print error that no remote media file selected
         return;
@@ -62,12 +63,18 @@ export default {
           remoteFileIsVideo = true;
         }
       }
-      if (!remoteFileIsVideo) {
-        return;
+      if (remoteFileIsVideo) {
+        this.startMediaDirectURL(remoteFile);
+      } else if (remoteFile.toLowerCase().endsWith('.m3u8')) {
+        this.startMediaM3U8(remoteFile);
+      } else {
+        if (this.$config.YTDLP_ENABLED) {
+          await this.startMediaYTDLP(remoteFile);
+        }
       }
-
+    },
+    startMediaDirectURL(remoteFile) {
       let remoteFilename = remoteFile.split('/')[remoteFile.split('/').length - 1];
-
       this.$root.mySocket.emit(
         "changeStream",
         this.$store.state.roomUUID,
@@ -87,6 +94,53 @@ export default {
         this.$store.state.roomUUID,
         mediaInfo
       );
+    },
+    startMediaM3U8(remotePlaylist) {
+      this.$root.mySocket.emit(
+        "changeStream",
+        this.$store.state.roomUUID,
+        remotePlaylist,
+        false
+      );
+      this.remoteMediaVisible = false;
+
+      const mediaInfo = {
+        Title: remotePlaylist,
+      }
+      this.$root.mySocket.emit(
+        "nowPlaying",
+        this.$store.state.roomUUID,
+        mediaInfo
+      );
+    },
+    async startMediaYTDLP(remotePage) {
+      this.$root.mySocket.emit(
+        "changeStream",
+        this.$store.state.roomUUID,
+        `${this.$config.BASE_URL}/api/ytdlp/${this.$store.state.roomUUID}/stream.m3u8?remotePage=${remotePage}`,
+        false
+      );
+      this.remoteMediaVisible = false;
+
+      let mediaInfo = {
+        Title: remotePage,
+      }
+      const res = await this.$axios.get(`${this.$config.BASE_URL}/api/ytdlp/${this.$store.state.roomUUID}/MediaInfo`);
+      if (!res.data.Error) {
+        mediaInfo = res.data;
+      }
+      this.$root.mySocket.emit(
+        "nowPlaying",
+        this.$store.state.roomUUID,
+        mediaInfo
+      );
+      if (mediaInfo.Poster !== undefined) {
+        this.$root.mySocket.emit(
+          "setPoster",
+          this.$store.state.roomUUID,
+          mediaInfo.Poster
+        );
+      }
     },
   }
 }

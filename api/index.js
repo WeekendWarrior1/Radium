@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const socket = require("socket.io");
+// const socket = require("socket.io");
 
 const config = require("../nuxt.config.js");
 
@@ -14,6 +14,7 @@ const jellyfin = require("./routes/jellyfin");
 const rooms = require("./routes/rooms");
 const localfs = require("./routes/localfs");
 const remoteMedia = require("./routes/remoteMedia");
+const ytdlp = require("./routes/ytdlp");
 const { makeSureThumbExists, makeSureSegmentIsFinished } = require("./routes/hls");
 
 app.use(cors({
@@ -36,6 +37,9 @@ if (config.default.publicRuntimeConfig.LOCAL_MEDIA_DIRECTORY) {
 }
 if (config.default.publicRuntimeConfig.REMOTE_MEDIA_ENABLED) {
   app.use(remoteMedia);
+}
+if (config.default.publicRuntimeConfig.YTDLP_ENABLED) {
+  app.use(ytdlp);
 }
 
 app.use(makeSureThumbExists);

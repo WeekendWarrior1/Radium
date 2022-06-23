@@ -4,12 +4,9 @@ import { validate as uuidValidate } from 'uuid';
 const router = Router();
 const { startHLSstream } = require('../../util/ffmpeg');
 
-const config = require("../../nuxt.config.js");
-
-// TODO support remote m3u8 and yt-dlp
+// const config = require("../../nuxt.config.js");
 
 router.get(["/remoteMedia/:roomUUID/:filename/stream.m3u8"], async function (req, res, next) {
-    console.log('router.get remoteMedia', req.params, req.path);
     try {
         if (req.params.filename === undefined) {
             throw new Error(`Paramater "item" not found in query parameters`);

@@ -5,7 +5,6 @@ const config = require("../nuxt.config.js");
 
 // const { jellyfinGetSubtitles } = require('../api/routes/jellyfin');
 
-const JSONStream = require('JSONStream');
 const fs = require('fs');
 
 const ffmpegJobQueue = {};
@@ -66,6 +65,60 @@ exports.startHLSstream = async function startHLSstream(roomUUID, itemId, mediaLo
     return playlist;
 }
 
+exports.startYTDLPHLSstream = async function startYTDLPHLSstream(roomUUID, itemId, mediaLocation, subtitleInfo) {
+    console.log({roomUUID, itemId, mediaLocation, subtitleInfo});
+    if (ffmpegJobQueue[roomUUID] == undefined) {
+        ffmpegJobQueue[roomUUID] = {};
+    }
+    let playlist = "";
+    const workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
+    if (ffmpegJobQueue[roomUUID]['ffmpeg'] === undefined && ffmpegJobQueue[roomUUID]['itemId'] !== itemId) {
+        ffmpegJobQueue[roomUUID]['ffmpeg'] = {};
+        ffmpegJobQueue[roomUUID]['itemId'] = itemId;
+        console.log(`Starting ${roomUUID} transcode job`);
+
+        ffmpegJobQueue[roomUUID]['mediaInfo'] = await ytdlpMediaInfo(mediaLocation);
+        const mediaInfo = ytdlpMediaInfoToFfprobe(ffmpegJobQueue[roomUUID]['mediaInfo']);
+        // catch m3u8 of remote media here and return it instead of doing our own transcode
+        if (mediaInfo.m3u8 !== undefined) {
+            let url = mediaInfo.m3u8
+            ffmpegJobQueue[roomUUID]['remoteM3u8'] = url;
+            return { url };
+        }
+
+        try {
+            await fs.promises.mkdir(workDir);
+        } catch (error) {
+            if (error.code === 'EEXIST') {
+                console.log(`'${roomUUID}' workdir already exists at: ${workDir}, removing all .ts and .m3u8 within...`)
+                (await fs.promises.readdir(workDir))
+                    .filter(f => (f.endsWith('.ts') || f.endsWith('.m3u8') || f.endsWith('.vtt') || f == 'ffmpeg_finished'))
+                    .map(async (f) => await fs.promises.unlink(workDir + f))
+            } else {
+                console.log(error);
+            }
+        }
+        const ffmpegCommand = `yt-dlp -f b ${mediaLocation} -o - | ` + transcodeStringBuilder(mediaInfo, 'pipe:', false, workDir, roomUUID)
+        ffmpegJobQueue[roomUUID]['ffmpeg'] = startffmpegHLSTranscode(ffmpegCommand, workDir, roomUUID);
+        console.log(`Started ${roomUUID} transcode job`);
+
+        playlist = await createHLSPlayList(workDir, 'playlist', roomUUID, mediaInfo, subtitleInfo);
+        ffmpegJobQueue[roomUUID]['playlist'] = playlist;
+    } else {
+        while (ffmpegJobQueue[roomUUID]['playlist'] === undefined && ffmpegJobQueue[roomUUID]['remoteM3u8'] === undefined) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        if (ffmpegJobQueue[roomUUID]['playlist'] !== undefined) {
+            playlist = ffmpegJobQueue[roomUUID]['playlist'];
+        } else if (ffmpegJobQueue[roomUUID]['remoteM3u8'] !== undefined) {
+            // remote m3u8 instead of doing our own transcode
+            return { 'url':  ffmpegJobQueue[roomUUID]['remoteM3u8']};
+        }
+        // playlist = await recurseGetPlaylist(workDir, 'playlist');
+    }
+    return { playlist };
+}
+
 async function recurseGetPlaylist(workDir, playlist_filename) {
     try {
         return await fs.promises.readFile(`${workDir}${playlist_filename}.m3u8`);
@@ -90,18 +143,16 @@ async function recurseGetPlaylistSegmentDurations(workDir, playlist_filename) {
 }
 
 // TODO sanitise roomUUID string
-function cleanUpffmpegDir(roomUUID) {
+exports.cleanUpffmpegDir = function cleanUpffmpegDir(roomUUID) {
     let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
     console.log(`Deleting ${workDir}...`)
     fs.rmSync(workDir, { recursive: true, force: true });
 }
 
-exports.cleanUpffmpegDir = cleanUpffmpegDir;
-
 function transcodeStringBuilder(mediaInfo, mediaLocation, seekTime, workDir, roomUUID) {
-    // TODO need to be passed in
-    const playlist_filename = 'playlist';
+    console.log('transcodeStringBuilder');
     const { fps, framesPerSegment, segmentsCount, segmentsLength, videoDuration } = getMediaSegmentsCountLengthAndFps(mediaInfo);
+    console.log('transcodeStringBuilder', fps, framesPerSegment, segmentsCount, segmentsLength, videoDuration);
 
     // const ffmpegArgs = [
     //     // mediaInfo.seekTime ? `-ss ${mediaInfo.seekTime} ` : "",
@@ -283,9 +334,85 @@ async function ffprobeMediaInfo(video_input) {
     }
 }
 
-function getMediaSegmentsCountLengthAndFps(mediaInfo) {
-    // console.log(mediaInfo.streams[0].tags);
+async function ytdlpMediaInfo(remoteURL) {
+    try {
+        const bl = await spawn(`yt-dlp`,[`-f`,`b`,`-j`, remoteURL]);
+        return JSON.parse(bl.toString());
+    } catch (e) {
+        // TODO this throws invis errors
+        console.log(e.stderr.toString())
+    }
+}
 
+exports.ytdlpMediaToRoomMetadata = async function ytdlpMediaToRoomMetadata(roomUUID) {
+    while (ffmpegJobQueue[roomUUID] === undefined || ffmpegJobQueue[roomUUID]['mediaInfo'] === undefined) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    let ytdlpmediaInfo = await ffmpegJobQueue[roomUUID]['mediaInfo'];
+    let mediaInfo = {
+        Title: ytdlpmediaInfo.title || ytdlpmediaInfo.webpage_url,
+        Year: new Date(ytdlpmediaInfo.timestamp * 1000).getFullYear(),
+        // Rated: res.data.OfficialRating,
+        // Genre: res.data.Genres.join(", "),
+        Runtime: `${Math.round(ytdlpmediaInfo.duration / 60)} mins`,
+        Plot: ytdlpmediaInfo.description || '',
+        // imdbRating: res.data.CommunityRating,
+    };
+    if (ytdlpmediaInfo.thumbnail) {
+        mediaInfo.Poster = ytdlpmediaInfo.thumbnail;
+    }
+    return mediaInfo
+}
+
+function ytdlpMediaInfoToFfprobe(mediaInfo) {
+    // find preferred yt-dlp stream
+    // TODO needs to handle catching 1080p and below, and preferring aac audio
+    // TODO as well as knowing video and audio codecs, and .split('+') on format_id
+    let bestStream;
+    let m3u8MaxFilesize = false;
+    let manifest_url = '';
+    for (let stream of mediaInfo.formats) {
+        if (stream.protocol === 'm3u8_native') {
+            if (m3u8MaxFilesize === false) {
+                m3u8MaxFilesize = stream.filesize_approx;
+                manifest_url = stream.manifest_url;
+            } else if (m3u8MaxFilesize > stream.filesize_approx) {
+                manifest_url = stream.manifest_url;
+                // TODO figure out if I care about adaptive.akamaized vs skyfire
+            } else if (m3u8MaxFilesize === stream.filesize_approx && manifest_url.includes('adaptive') && !stream.manifest_url.includes('adaptive')) {
+                manifest_url = stream.manifest_url;
+            }
+        }
+        if (stream.format_id === mediaInfo.format_id) {
+            bestStream = stream;
+        }
+    }
+    console.log("bestStream", bestStream);
+
+    let newMediaInfo = {
+        'streams': [
+            {
+                'avg_frame_rate': bestStream.fps.toString(),
+                'FrameCount': (mediaInfo.duration * bestStream.fps).toString(),
+                'codec_name': 'unknown',
+            },
+            {
+                'codec_name': 'unknown',
+                'channels': 2
+
+            }
+        ],
+        'format': {
+            'bit_rate': 0
+        }
+    }
+    if (m3u8MaxFilesize !== false) {
+        newMediaInfo.m3u8 = manifest_url;
+    }
+    return newMediaInfo;
+}
+
+function getMediaSegmentsCountLengthAndFps(mediaInfo) {
     let oldfps = mediaInfo.streams[0].avg_frame_rate
     let fps = oldfps;
     if (fps.includes('/')) {
@@ -397,21 +524,13 @@ function startffmpegHLSTranscode(ffmpegCommand, destination, roomUUID) {
     });
 }
 
-async function ffmpegConvertSubtitles(subLocation, filename, extension) {
-    // let ffmpegCommand = `ffmpeg -i ${subLocation} -map 0:s:0 ${filename}`;
+exports.ffmpegConvertSubtitles = async function ffmpegConvertSubtitles(subLocation, filename, extension) {
     const ffmpegCommand = ['-y', '-i',subLocation, '-map', '0:s:0', filename]
     return spawn(`ffmpeg`,ffmpegCommand);
 }
 
-exports.ffmpegConvertSubtitles = ffmpegConvertSubtitles;
-
 exports.generateThumb = async function generateThumb(filename, mediaLocation) {
-// async function ffmpegConvertSubtitles(subLocation, filename, extension) {
-    // let ffmpegCommand = `ffmpeg -i ${subLocation} -map 0:s:0 ${filename}`;
-    // const ffmpegCommand = ['-y', '-i',subLocation, '-map', '0:s:0', filename]
-    // const ffmpegCommand = ['-ss', '00:00:30.00', '-i', mediaLocation, '-vf', 'scale=320:320:force_original_aspect_ratio=decrease', '-vframes', '1', `${config.default.publicRuntimeConfig.THUMBS_SERVE_DIR}${filename}.jpg`]
     const ffmpegCommand = ['-ss', '00:00:30.00', '-i', mediaLocation, '-vframes', '1', `${config.default.publicRuntimeConfig.THUMBS_SERVE_DIR}${filename}.jpg`]
     console.log('generateThumb', ffmpegCommand);
     return await spawn(`ffmpeg`, ffmpegCommand);
 }
-// ffmpeg -ss 00:00:01.00 -i input.mp4 -vf 'scale=320:320:force_original_aspect_ratio=decrease' -vframes 1 output.jpg
