@@ -4,6 +4,7 @@ const spawn = require('await-spawn')
 const config = require("../nuxt.config.js");
 
 // const { jellyfinGetSubtitles } = require('../api/routes/jellyfin');
+import { validate as uuidValidate } from 'uuid';
 
 const fs = require('fs');
 
@@ -20,7 +21,7 @@ exports.startHLSstream = async function startHLSstream(roomUUID, itemId, mediaLo
     let playlist = "";
     const workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
     if (ffmpegJobQueue[roomUUID]['ffmpeg'] === undefined && ffmpegJobQueue[roomUUID]['itemId'] !== itemId) {
-        ffmpegJobQueue[roomUUID]['ffmpeg'] = {};
+        // ffmpegJobQueue[roomUUID]['ffmpeg'] = {};
         ffmpegJobQueue[roomUUID]['itemId'] = itemId;
         console.log(`Starting ${roomUUID} transcode job`);
         const mediaInfo = await ffprobeMediaInfo(mediaLocation);
@@ -36,9 +37,12 @@ exports.startHLSstream = async function startHLSstream(roomUUID, itemId, mediaLo
         } catch (error) {
             if (error.code === 'EEXIST') {
                 console.log(`'${roomUUID}' workdir already exists at: ${workDir}, removing all .ts and .m3u8 within...`)
-                (await fs.promises.readdir(workDir))
+                await Promise.all(
+                    (await fs.promises.readdir(workDir))
                     .filter(f => (f.endsWith('.ts') || f.endsWith('.m3u8') || f.endsWith('.vtt') || f == 'ffmpeg_finished'))
-                    .map(async (f) => await fs.promises.unlink(workDir + f))
+                    .map(f => fs.promises.unlink(workDir + f).catch(() => null))
+                );
+                // console.log(`Deleted contents of dir, now contains: ${await fs.promises.readdir(workDir)}`)
             } else {
                 console.log(error);
             }
@@ -73,7 +77,7 @@ exports.startYTDLPHLSstream = async function startYTDLPHLSstream(roomUUID, itemI
     let playlist = "";
     const workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
     if (ffmpegJobQueue[roomUUID]['ffmpeg'] === undefined && ffmpegJobQueue[roomUUID]['itemId'] !== itemId) {
-        ffmpegJobQueue[roomUUID]['ffmpeg'] = {};
+        // ffmpegJobQueue[roomUUID]['ffmpeg'] = {};
         ffmpegJobQueue[roomUUID]['itemId'] = itemId;
         console.log(`Starting ${roomUUID} transcode job`);
 
@@ -143,16 +147,20 @@ async function recurseGetPlaylistSegmentDurations(workDir, playlist_filename) {
 }
 
 // TODO sanitise roomUUID string
-exports.cleanUpffmpegDir = function cleanUpffmpegDir(roomUUID) {
+exports.cleanUpffmpegDir = async function cleanUpffmpegDir(roomUUID) {
+    if (!uuidValidate(roomUUID)) {
+        throw new Error('Invalid room UUID');
+    }
     let workDir = `${config.default.publicRuntimeConfig.HLS_SERVE_DIR}${roomUUID}/`;
     console.log(`Deleting ${workDir}...`)
-    fs.rmSync(workDir, { recursive: true, force: true });
+    // fs.rmSync(workDir, { recursive: true, force: true });
+    await fs.promises.rm(workDir, { recursive: true, force: true });
 }
 
 function transcodeStringBuilder(mediaInfo, mediaLocation, seekTime, workDir, roomUUID) {
-    console.log('transcodeStringBuilder');
+    // console.log('transcodeStringBuilder');
     const { fps, framesPerSegment, segmentsCount, segmentsLength, videoDuration } = getMediaSegmentsCountLengthAndFps(mediaInfo);
-    console.log('transcodeStringBuilder', fps, framesPerSegment, segmentsCount, segmentsLength, videoDuration);
+    // console.log('transcodeStringBuilder', fps, framesPerSegment, segmentsCount, segmentsLength, videoDuration);
 
     // const ffmpegArgs = [
     //     // mediaInfo.seekTime ? `-ss ${mediaInfo.seekTime} ` : "",

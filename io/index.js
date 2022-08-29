@@ -119,18 +119,22 @@ export default function() {
       });
 
       socket.on("userLeavesRoom", (roomUUID, user, currentTime) => {
-        const u = roomsCache[roomUUID].users.find(obj => obj.username == user.username);
+        if (roomsCache[roomUUID] !== undefined) {
+          const u = roomsCache[roomUUID].users.find(obj => obj.username == user.username);
 
-        if (roomsCache[roomUUID].users.indexOf(u) > -1) {
-          console.log(`Removing ${user.username} from room: ${roomUUID}`);
-          roomsCache[roomUUID].users.splice(roomsCache[roomUUID].users.indexOf(u), 1);
-          if (roomsCache[roomUUID].users.length == 0 && currentTime > 0) {
-            roomsCache[roomUUID]['currentTime'] = currentTime;
+          if (roomsCache[roomUUID].users.indexOf(u) > -1) {
+            console.log(`Removing ${user.username} from room: ${roomUUID}`);
+            roomsCache[roomUUID].users.splice(roomsCache[roomUUID].users.indexOf(u), 1);
+            if (roomsCache[roomUUID].users.length == 0 && currentTime > 0) {
+              roomsCache[roomUUID]['currentTime'] = currentTime;
+            }
+            io.emit("userList", roomsCache[roomUUID].users);
+            // io.emit("roomsUpdated", roomsCache);
+            // socket.leave(roomUUID);
           }
-          io.emit("userList", roomsCache[roomUUID].users);
-          io.emit("roomsUpdated", roomsCache);
-          socket.leave(roomUUID);
         }
+        io.emit("roomsUpdated", roomsCache);
+        socket.leave(roomUUID);
       });
 
 
@@ -174,7 +178,8 @@ export default function() {
           if (room === roomUUID) {
             console.log(`Cancelling ${roomUUID} transcode job`);
             if (ffmpegJobQueue[roomUUID]['ffmpeg'] !== undefined) {
-              ffmpegJobQueue[roomUUID]['ffmpeg'].kill();
+              let res = ffmpegJobQueue[roomUUID]['ffmpeg'].kill();
+              console.log(`ffmpegJobQueue[roomUUID]['ffmpeg'].kill() res: ${res}`);
               delete ffmpegJobQueue[roomUUID]['ffmpeg'];
               cleanUpffmpegDir(roomUUID);
             }
